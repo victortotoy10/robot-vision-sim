@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<sdf version="1.10">
+<sdf version="1.9">
   <world name="camera_world">
 
     <physics name="1ms" type="ignored">
@@ -13,14 +13,14 @@
             name="gz::sim::systems::UserCommands"/>
     <plugin filename="gz-sim-scene-broadcaster-system"
             name="gz::sim::systems::SceneBroadcaster"/>
-    <!-- The Sensors system is what makes the camera (and lidar) actually fire -->
     <plugin filename="gz-sim-sensors-system"
             name="gz::sim::systems::Sensors">
       <render_engine>ogre2</render_engine>
     </plugin>
 
+    <!-- Sun without shadows for VM performance -->
     <light type="directional" name="sun">
-      <cast_shadows>true</cast_shadows>
+      <cast_shadows>false</cast_shadows>
       <pose>0 0 10 0 0 0</pose>
       <diffuse>0.95 0.95 0.95 1</diffuse>
       <specular>0.25 0.25 0.25 1</specular>
@@ -46,6 +46,7 @@
           </geometry>
         </collision>
         <visual name="visual">
+          <cast_shadows>false</cast_shadows>
           <geometry>
             <plane>
               <normal>0 0 1</normal>
@@ -60,125 +61,244 @@
       </link>
     </model>
 
-    <!-- ============== Colourful objects in front of the robot ============== -->
-    <!-- Bright primary colours so the camera image is unmistakable in RViz   -->
+    <!-- ============== CARRETERA CIRCULAR DE UN CARRIL (OCTÁGONO DOBLE BANDA) ============== -->
+    <!-- Diámetro aprox. de 6 metros. Ancho de carril: 0.6m. Sin colisiones. Elevado 5mm. -->
 
-    <model name="red_box">
+    <!-- ================= Tramo 1 ================= -->
+    <model name="linea_1_izq">
       <static>true</static>
-      <pose>2.0 0.0 0.25 0 0 0</pose>
+      <pose>0.95 0.72 0.005 0 0 0.39</pose>
       <link name="link">
-        <collision name="c">
-          <geometry><box><size>0.5 0.5 0.5</size></box></geometry>
-        </collision>
         <visual name="v">
-          <geometry><box><size>0.5 0.5 0.5</size></box></geometry>
+          <cast_shadows>false</cast_shadows>
+          <geometry><box><size>2.3 0.05 0.01</size></box></geometry>
           <material>
-            <ambient>0.95 0.15 0.15 1</ambient>
-            <diffuse>0.95 0.15 0.15 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
+            <ambient>0.9 0.9 0.0 1</ambient>
+            <diffuse>0.9 0.9 0.0 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="linea_1_der">
+      <static>true</static>
+      <pose>1.17 0.16 0.005 0 0 0.39</pose>
+      <link name="link">
+        <visual name="v">
+          <cast_shadows>false</cast_shadows>
+          <geometry><box><size>2.3 0.05 0.01</size></box></geometry>
+          <material>
+            <ambient>0.9 0.9 0.0 1</ambient>
+            <diffuse>0.9 0.9 0.0 1</diffuse>
           </material>
         </visual>
       </link>
     </model>
 
-    <model name="green_cylinder">
+    <!-- ================= Tramo 2 ================= -->
+    <model name="linea_2_izq">
       <static>true</static>
-      <pose>1.6 0.9 0.4 0 0 0</pose>
+      <pose>2.28 2.05 0.005 0 0 1.18</pose>
       <link name="link">
-        <collision name="c">
-          <geometry><cylinder><radius>0.22</radius><length>0.8</length></cylinder></geometry>
-        </collision>
         <visual name="v">
-          <geometry><cylinder><radius>0.22</radius><length>0.8</length></cylinder></geometry>
+          <cast_shadows>false</cast_shadows>
+          <geometry><box><size>2.3 0.05 0.01</size></box></geometry>
           <material>
-            <ambient>0.20 0.85 0.25 1</ambient>
-            <diffuse>0.20 0.85 0.25 1</diffuse>
+            <ambient>0.9 0.9 0.0 1</ambient>
+            <diffuse>0.9 0.9 0.0 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="linea_2_der">
+      <static>true</static>
+      <pose>2.84 1.83 0.005 0 0 1.18</pose>
+      <link name="link">
+        <visual name="v">
+          <cast_shadows>false</cast_shadows>
+          <geometry><box><size>2.3 0.05 0.01</size></box></geometry>
+          <material>
+            <ambient>0.9 0.9 0.0 1</ambient>
+            <diffuse>0.9 0.9 0.0 1</diffuse>
           </material>
         </visual>
       </link>
     </model>
 
-    <model name="blue_cylinder">
+    <!-- ================= Tramo 3 ================= -->
+    <model name="linea_3_izq">
       <static>true</static>
-      <pose>1.6 -0.9 0.4 0 0 0</pose>
+      <pose>2.28 3.95 0.005 0 0 1.96</pose>
       <link name="link">
-        <collision name="c">
-          <geometry><cylinder><radius>0.22</radius><length>0.8</length></cylinder></geometry>
-        </collision>
         <visual name="v">
-          <geometry><cylinder><radius>0.22</radius><length>0.8</length></cylinder></geometry>
+          <cast_shadows>false</cast_shadows>
+          <geometry><box><size>2.3 0.05 0.01</size></box></geometry>
           <material>
-            <ambient>0.18 0.40 0.95 1</ambient>
-            <diffuse>0.18 0.40 0.95 1</diffuse>
+            <ambient>0.9 0.9 0.0 1</ambient>
+            <diffuse>0.9 0.9 0.0 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="linea_3_der">
+      <static>true</static>
+      <pose>2.84 4.17 0.005 0 0 1.96</pose>
+      <link name="link">
+        <visual name="v">
+          <cast_shadows>false</cast_shadows>
+          <geometry><box><size>2.3 0.05 0.01</size></box></geometry>
+          <material>
+            <ambient>0.9 0.9 0.0 1</ambient>
+            <diffuse>0.9 0.9 0.0 1</diffuse>
           </material>
         </visual>
       </link>
     </model>
 
-    <model name="yellow_box">
+    <!-- ================= Tramo 4 ================= -->
+    <model name="linea_4_izq">
       <static>true</static>
-      <pose>3.0 1.5 0.3 0 0 0.5</pose>
+      <pose>0.95 5.28 0.005 0 0 2.75</pose>
       <link name="link">
-        <collision name="c">
-          <geometry><box><size>0.6 0.6 0.6</size></box></geometry>
-        </collision>
         <visual name="v">
-          <geometry><box><size>0.6 0.6 0.6</size></box></geometry>
+          <cast_shadows>false</cast_shadows>
+          <geometry><box><size>2.3 0.05 0.01</size></box></geometry>
           <material>
-            <ambient>0.98 0.85 0.15 1</ambient>
-            <diffuse>0.98 0.85 0.15 1</diffuse>
+            <ambient>0.9 0.9 0.0 1</ambient>
+            <diffuse>0.9 0.9 0.0 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="linea_4_der">
+      <static>true</static>
+      <pose>1.17 5.84 0.005 0 0 2.75</pose>
+      <link name="link">
+        <visual name="v">
+          <cast_shadows>false</cast_shadows>
+          <geometry><box><size>2.3 0.05 0.01</size></box></geometry>
+          <material>
+            <ambient>0.9 0.9 0.0 1</ambient>
+            <diffuse>0.9 0.9 0.0 1</diffuse>
           </material>
         </visual>
       </link>
     </model>
 
-    <model name="magenta_sphere">
+    <!-- ================= Tramo 5 ================= -->
+    <model name="linea_5_izq">
       <static>true</static>
-      <pose>2.8 -1.4 0.35 0 0 0</pose>
+      <pose>-0.95 5.28 0.005 0 0 -2.75</pose>
       <link name="link">
-        <collision name="c">
-          <geometry><sphere><radius>0.35</radius></sphere></geometry>
-        </collision>
         <visual name="v">
-          <geometry><sphere><radius>0.35</radius></sphere></geometry>
+          <cast_shadows>false</cast_shadows>
+          <geometry><box><size>2.3 0.05 0.01</size></box></geometry>
           <material>
-            <ambient>0.90 0.20 0.75 1</ambient>
-            <diffuse>0.90 0.20 0.75 1</diffuse>
+            <ambient>0.9 0.9 0.0 1</ambient>
+            <diffuse>0.9 0.9 0.0 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="linea_5_der">
+      <static>true</static>
+      <pose>-1.17 5.84 0.005 0 0 -2.75</pose>
+      <link name="link">
+        <visual name="v">
+          <cast_shadows>false</cast_shadows>
+          <geometry><box><size>2.3 0.05 0.01</size></box></geometry>
+          <material>
+            <ambient>0.9 0.9 0.0 1</ambient>
+            <diffuse>0.9 0.9 0.0 1</diffuse>
           </material>
         </visual>
       </link>
     </model>
 
-    <model name="orange_box">
+    <!-- ================= Tramo 6 ================= -->
+    <model name="linea_6_izq">
       <static>true</static>
-      <pose>4.5 0.0 0.4 0 0 0</pose>
+      <pose>-2.28 3.95 0.005 0 0 -1.96</pose>
       <link name="link">
-        <collision name="c">
-          <geometry><box><size>0.8 0.8 0.8</size></box></geometry>
-        </collision>
         <visual name="v">
-          <geometry><box><size>0.8 0.8 0.8</size></box></geometry>
+          <cast_shadows>false</cast_shadows>
+          <geometry><box><size>2.3 0.05 0.01</size></box></geometry>
           <material>
-            <ambient>1.0 0.55 0.10 1</ambient>
-            <diffuse>1.0 0.55 0.10 1</diffuse>
+            <ambient>0.9 0.9 0.0 1</ambient>
+            <diffuse>0.9 0.9 0.0 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="linea_6_der">
+      <static>true</static>
+      <pose>-2.84 4.17 0.005 0 0 -1.96</pose>
+      <link name="link">
+        <visual name="v">
+          <cast_shadows>false</cast_shadows>
+          <geometry><box><size>2.3 0.05 0.01</size></box></geometry>
+          <material>
+            <ambient>0.9 0.9 0.0 1</ambient>
+            <diffuse>0.9 0.9 0.0 1</diffuse>
           </material>
         </visual>
       </link>
     </model>
 
-    <!-- A couple of obstacles behind so the lidar still has a 360 view -->
-    <model name="grey_box_back">
+    <!-- ================= Tramo 7 ================= -->
+    <model name="linea_7_izq">
       <static>true</static>
-      <pose>-1.8 0.0 0.25 0 0 0</pose>
+      <pose>-2.28 2.05 0.005 0 0 -1.18</pose>
       <link name="link">
-        <collision name="c">
-          <geometry><box><size>0.5 1.0 0.5</size></box></geometry>
-        </collision>
         <visual name="v">
-          <geometry><box><size>0.5 1.0 0.5</size></box></geometry>
+          <cast_shadows>false</cast_shadows>
+          <geometry><box><size>2.3 0.05 0.01</size></box></geometry>
           <material>
-            <ambient>0.55 0.55 0.60 1</ambient>
-            <diffuse>0.55 0.55 0.60 1</diffuse>
+            <ambient>0.9 0.9 0.0 1</ambient>
+            <diffuse>0.9 0.9 0.0 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="linea_7_der">
+      <static>true</static>
+      <pose>-2.84 1.83 0.005 0 0 -1.18</pose>
+      <link name="link">
+        <visual name="v">
+          <cast_shadows>false</cast_shadows>
+          <geometry><box><size>2.3 0.05 0.01</size></box></geometry>
+          <material>
+            <ambient>0.9 0.9 0.0 1</ambient>
+            <diffuse>0.9 0.9 0.0 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ================= Tramo 8 ================= -->
+    <model name="linea_8_izq">
+      <static>true</static>
+      <pose>-0.95 0.72 0.005 0 0 -0.39</pose>
+      <link name="link">
+        <visual name="v">
+          <cast_shadows>false</cast_shadows>
+          <geometry><box><size>2.3 0.05 0.01</size></box></geometry>
+          <material>
+            <ambient>0.9 0.9 0.0 1</ambient>
+            <diffuse>0.9 0.9 0.0 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="linea_8_der">
+      <static>true</static>
+      <pose>-1.17 0.16 0.005 0 0 -0.39</pose>
+      <link name="link">
+        <visual name="v">
+          <cast_shadows>false</cast_shadows>
+          <geometry><box><size>2.3 0.05 0.01</size></box></geometry>
+          <material>
+            <ambient>0.9 0.9 0.0 1</ambient>
+            <diffuse>0.9 0.9 0.0 1</diffuse>
           </material>
         </visual>
       </link>

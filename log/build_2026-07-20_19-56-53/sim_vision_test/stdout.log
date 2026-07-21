@@ -1,0 +1,35 @@
+running egg_info
+creating ../../build/sim_vision_test/sim_vision_test.egg-info
+writing ../../build/sim_vision_test/sim_vision_test.egg-info/PKG-INFO
+writing dependency_links to ../../build/sim_vision_test/sim_vision_test.egg-info/dependency_links.txt
+writing entry points to ../../build/sim_vision_test/sim_vision_test.egg-info/entry_points.txt
+writing requirements to ../../build/sim_vision_test/sim_vision_test.egg-info/requires.txt
+writing top-level names to ../../build/sim_vision_test/sim_vision_test.egg-info/top_level.txt
+writing manifest file '../../build/sim_vision_test/sim_vision_test.egg-info/SOURCES.txt'
+reading manifest file '../../build/sim_vision_test/sim_vision_test.egg-info/SOURCES.txt'
+writing manifest file '../../build/sim_vision_test/sim_vision_test.egg-info/SOURCES.txt'
+running build
+running build_py
+creating /home/akenitoy/robot-vision-sim/build/sim_vision_test/build
+creating /home/akenitoy/robot-vision-sim/build/sim_vision_test/build/lib
+creating /home/akenitoy/robot-vision-sim/build/sim_vision_test/build/lib/sim_vision_test
+copying sim_vision_test/__init__.py -> /home/akenitoy/robot-vision-sim/build/sim_vision_test/build/lib/sim_vision_test
+copying sim_vision_test/vision_sim_node.py -> /home/akenitoy/robot-vision-sim/build/sim_vision_test/build/lib/sim_vision_test
+running install
+running install_lib
+creating /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages/sim_vision_test
+copying /home/akenitoy/robot-vision-sim/build/sim_vision_test/build/lib/sim_vision_test/__init__.py -> /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages/sim_vision_test
+copying /home/akenitoy/robot-vision-sim/build/sim_vision_test/build/lib/sim_vision_test/vision_sim_node.py -> /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages/sim_vision_test
+byte-compiling /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages/sim_vision_test/__init__.py to __init__.cpython-310.pyc
+byte-compiling /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages/sim_vision_test/vision_sim_node.py to vision_sim_node.cpython-310.pyc
+running install_data
+creating /home/akenitoy/robot-vision-sim/install/sim_vision_test/share/ament_index
+creating /home/akenitoy/robot-vision-sim/install/sim_vision_test/share/ament_index/resource_index
+creating /home/akenitoy/robot-vision-sim/install/sim_vision_test/share/ament_index/resource_index/packages
+copying resource/sim_vision_test -> /home/akenitoy/robot-vision-sim/install/sim_vision_test/share/ament_index/resource_index/packages
+copying package.xml -> /home/akenitoy/robot-vision-sim/install/sim_vision_test/share/sim_vision_test
+running install_egg_info
+Copying ../../build/sim_vision_test/sim_vision_test.egg-info to /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages/sim_vision_test-0.0.0-py3.10.egg-info
+running install_scripts
+Installing vision_sim_node script to /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/sim_vision_test
+writing list of installed files to '/home/akenitoy/robot-vision-sim/build/sim_vision_test/install.log'

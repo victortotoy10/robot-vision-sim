@@ -1,7 +1,8 @@
 import os
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 
@@ -20,6 +21,13 @@ def generate_launch_description():
     with open(urdf_file, 'r') as f:
         robot_description = f.read()
 
+    # Launch argument for headless mode
+    headless_arg = DeclareLaunchArgument(
+        'headless',
+        default_value='false',
+        description='Ejecutar Gazebo en modo headless (servidor sin GUI 3D)'
+    )
+
     # Robot State Publisher — broadcasts TF from URDF
     robot_state_publisher = Node(
         package='robot_state_publisher',
@@ -29,7 +37,14 @@ def generate_launch_description():
         output='screen'
     )
 
-    # Gazebo with our custom camera world
+    # Gazebo with our custom camera world, optionally headless
+    # If headless is 'true', we pass '-s -r <world>', otherwise just '-r <world>'
+    gz_args = PythonExpression([
+        "'-s -r ' + '" + world_file + "' if '", 
+        LaunchConfiguration('headless'), 
+        "' == 'true' else '-r ' + '" + world_file + "'"
+    ])
+
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(
@@ -37,7 +52,7 @@ def generate_launch_description():
                 'launch', 'gz_sim.launch.py'
             )
         ),
-        launch_arguments={'gz_args': f'-r {world_file}'}.items()
+        launch_arguments={'gz_args': gz_args}.items()
     )
 
     # Spawn the robot from /robot_description
@@ -53,8 +68,7 @@ def generate_launch_description():
     )
 
     # Bridge: Gazebo <-> ROS2
-    # Adds the new /camera/image and /camera/camera_info topics on top of
-    # the existing cmd_vel / odom / joint_states / scan from ros_03.
+    # Maps cmd_vel, odom, joint_states, scan, camera/image_raw, camera_info, clock, and TF.
     bridge = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
@@ -63,13 +77,19 @@ def generate_launch_description():
             '/odom@nav_msgs/msg/Odometry@gz.msgs.Odometry',
             '/joint_states@sensor_msgs/msg/JointState@gz.msgs.Model',
             '/scan@sensor_msgs/msg/LaserScan@gz.msgs.LaserScan',
-            '/camera/image@sensor_msgs/msg/Image@gz.msgs.Image',
+            '/camera/image_raw@sensor_msgs/msg/Image@gz.msgs.Image',
             '/camera/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
+            '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
+            '/model/my_robot/tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V',
+        ],
+        remappings=[
+            ('/model/my_robot/tf', '/tf'),
         ],
         output='screen'
     )
 
     return LaunchDescription([
+        headless_arg,
         robot_state_publisher,
         gazebo,
         spawn_robot,

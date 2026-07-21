@@ -1,0 +1,37 @@
+[5.213s] Invoking command in '/home/akenitoy/robot-vision-sim/src/sim_vision_test': PYTHONPATH=/home/akenitoy/robot-vision-sim/build/sim_vision_test/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sim_vision_test build --build-base /home/akenitoy/robot-vision-sim/build/sim_vision_test/build install --record /home/akenitoy/robot-vision-sim/build/sim_vision_test/install.log --install-scripts $base/lib/sim_vision_test --single-version-externally-managed install_data
+[7.208s] running egg_info
+[7.211s] creating ../../build/sim_vision_test/sim_vision_test.egg-info
+[7.211s] writing ../../build/sim_vision_test/sim_vision_test.egg-info/PKG-INFO
+[7.211s] writing dependency_links to ../../build/sim_vision_test/sim_vision_test.egg-info/dependency_links.txt
+[7.211s] writing entry points to ../../build/sim_vision_test/sim_vision_test.egg-info/entry_points.txt
+[7.212s] writing requirements to ../../build/sim_vision_test/sim_vision_test.egg-info/requires.txt
+[7.212s] writing top-level names to ../../build/sim_vision_test/sim_vision_test.egg-info/top_level.txt
+[7.212s] writing manifest file '../../build/sim_vision_test/sim_vision_test.egg-info/SOURCES.txt'
+[7.215s] reading manifest file '../../build/sim_vision_test/sim_vision_test.egg-info/SOURCES.txt'
+[7.223s] writing manifest file '../../build/sim_vision_test/sim_vision_test.egg-info/SOURCES.txt'
+[7.224s] running build
+[7.224s] running build_py
+[7.229s] creating /home/akenitoy/robot-vision-sim/build/sim_vision_test/build
+[7.229s] creating /home/akenitoy/robot-vision-sim/build/sim_vision_test/build/lib
+[7.230s] creating /home/akenitoy/robot-vision-sim/build/sim_vision_test/build/lib/sim_vision_test
+[7.230s] copying sim_vision_test/__init__.py -> /home/akenitoy/robot-vision-sim/build/sim_vision_test/build/lib/sim_vision_test
+[7.230s] copying sim_vision_test/vision_sim_node.py -> /home/akenitoy/robot-vision-sim/build/sim_vision_test/build/lib/sim_vision_test
+[7.231s] running install
+[7.235s] running install_lib
+[7.237s] creating /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages/sim_vision_test
+[7.237s] copying /home/akenitoy/robot-vision-sim/build/sim_vision_test/build/lib/sim_vision_test/__init__.py -> /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages/sim_vision_test
+[7.237s] copying /home/akenitoy/robot-vision-sim/build/sim_vision_test/build/lib/sim_vision_test/vision_sim_node.py -> /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages/sim_vision_test
+[7.241s] byte-compiling /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages/sim_vision_test/__init__.py to __init__.cpython-310.pyc
+[7.242s] byte-compiling /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages/sim_vision_test/vision_sim_node.py to vision_sim_node.cpython-310.pyc
+[7.246s] running install_data
+[7.247s] creating /home/akenitoy/robot-vision-sim/install/sim_vision_test/share/ament_index
+[7.247s] creating /home/akenitoy/robot-vision-sim/install/sim_vision_test/share/ament_index/resource_index
+[7.247s] creating /home/akenitoy/robot-vision-sim/install/sim_vision_test/share/ament_index/resource_index/packages
+[7.249s] copying resource/sim_vision_test -> /home/akenitoy/robot-vision-sim/install/sim_vision_test/share/ament_index/resource_index/packages
+[7.250s] copying package.xml -> /home/akenitoy/robot-vision-sim/install/sim_vision_test/share/sim_vision_test
+[7.250s] running install_egg_info
+[7.257s] Copying ../../build/sim_vision_test/sim_vision_test.egg-info to /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages/sim_vision_test-0.0.0-py3.10.egg-info
+[7.257s] running install_scripts
+[7.335s] Installing vision_sim_node script to /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/sim_vision_test
+[7.342s] writing list of installed files to '/home/akenitoy/robot-vision-sim/build/sim_vision_test/install.log'
+[7.537s] Invoked command in '/home/akenitoy/robot-vision-sim/src/sim_vision_test' returned '0': PYTHONPATH=/home/akenitoy/robot-vision-sim/build/sim_vision_test/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/sim_vision_test build --build-base /home/akenitoy/robot-vision-sim/build/sim_vision_test/build install --record /home/akenitoy/robot-vision-sim/build/sim_vision_test/install.log --install-scripts $base/lib/sim_vision_test --single-version-externally-managed install_data

@@ -1,0 +1,112 @@
+[0.000000] (-) TimerEvent: {}
+[0.005981] (sim_vision_test) JobQueued: {'identifier': 'sim_vision_test', 'dependencies': OrderedDict()}
+[0.012848] (sim_vision_test) JobStarted: {'identifier': 'sim_vision_test'}
+[0.094093] (-) TimerEvent: {}
+[0.209957] (-) TimerEvent: {}
+[0.316902] (-) TimerEvent: {}
+[0.427488] (-) TimerEvent: {}
+[0.535367] (-) TimerEvent: {}
+[0.652892] (-) TimerEvent: {}
+[0.757020] (-) TimerEvent: {}
+[0.860491] (-) TimerEvent: {}
+[0.965299] (-) TimerEvent: {}
+[1.066944] (-) TimerEvent: {}
+[1.173297] (-) TimerEvent: {}
+[1.277387] (-) TimerEvent: {}
+[1.384012] (-) TimerEvent: {}
+[1.496973] (-) TimerEvent: {}
+[1.608205] (-) TimerEvent: {}
+[1.720131] (-) TimerEvent: {}
+[1.822953] (-) TimerEvent: {}
+[1.924586] (-) TimerEvent: {}
+[2.036395] (-) TimerEvent: {}
+[2.151649] (-) TimerEvent: {}
+[2.255937] (-) TimerEvent: {}
+[2.359540] (-) TimerEvent: {}
+[2.471568] (-) TimerEvent: {}
+[2.588556] (-) TimerEvent: {}
+[2.710743] (-) TimerEvent: {}
+[2.840036] (-) TimerEvent: {}
+[2.944243] (-) TimerEvent: {}
+[3.048477] (-) TimerEvent: {}
+[3.151993] (-) TimerEvent: {}
+[3.254844] (-) TimerEvent: {}
+[3.356839] (-) TimerEvent: {}
+[3.461169] (-) TimerEvent: {}
+[3.564083] (-) TimerEvent: {}
+[3.673431] (-) TimerEvent: {}
+[3.776975] (-) TimerEvent: {}
+[3.882704] (-) TimerEvent: {}
+[3.984171] (-) TimerEvent: {}
+[4.089091] (-) TimerEvent: {}
+[4.192875] (-) TimerEvent: {}
+[4.296845] (-) TimerEvent: {}
+[4.400121] (-) TimerEvent: {}
+[4.518763] (-) TimerEvent: {}
+[4.624704] (-) TimerEvent: {}
+[4.730266] (-) TimerEvent: {}
+[4.842848] (-) TimerEvent: {}
+[4.955241] (-) TimerEvent: {}
+[5.063168] (-) TimerEvent: {}
+[5.138581] (sim_vision_test) Command: {'cmd': ['/usr/bin/python3', '-W', 'ignore:setup.py install is deprecated', '-W', 'ignore:easy_install command is deprecated', 'setup.py', 'egg_info', '--egg-base', '../../build/sim_vision_test', 'build', '--build-base', '/home/akenitoy/robot-vision-sim/build/sim_vision_test/build', 'install', '--record', '/home/akenitoy/robot-vision-sim/build/sim_vision_test/install.log', '--install-scripts', '$base/lib/sim_vision_test', '--single-version-externally-managed', 'install_data'], 'cwd': '/home/akenitoy/robot-vision-sim/src/sim_vision_test', 'env': {'LESSOPEN': '| /usr/bin/lesspipe %s', 'VSCODE_CWD': '/home/akenitoy/Downloads/Antigravity IDE', 'LANGUAGE': 'en_US:', 'USER': 'akenitoy', 'ANTIGRAVITY_SOURCE_METADATA': '{"tool":{"conversationId":"5dbd6b77-eb51-4b56-882f-a313c6d6d980","stepIndex":62,"toolCall":{"id":"ezkuv64c","name":"run_command","argumentsJson":"{\\"CommandLine\\":\\"colcon build --packages-select sim_vision_test\\",\\"Cwd\\":\\"/home/akenitoy/robot-vision-sim\\",\\"WaitMsBeforeAsync\\":5000,\\"toolAction\\":\\"Building ROS 2 package\\",\\"toolSummary\\":\\"Build package\\"}","thinkingSignature":"Eo8DCowDARFNMg/bqgpE/Phfh1YbER1biCMQVWRxjYwm4izwb4Foy33F5R7p7rcCUpYLwW7s9+5uKDvc8/jpn1v0xJLJviezz1ZPuWJj4Kbe/IJPtMdS4IlSc7KTOH6LdhkYSBWtJF0Kh8SHEKUCrB94mNAGGtMPSHN3cN5Yp+V4AFcZo5aopo9R5UYnWSHAb+e7TzQ4emUK1ACnR4d/n1imBhgxGwzqFPk10+js24vqsRx6d2BZ5L5uZ/yetVed2/W2SM+6sOnqDvjfo1VVdnNXfPbQI/0pkK0pkxrGiq2r7qMs3j06VYXkZxW/Id7NBX30lUFkCQwl56bCOyfvOGtJUBSlNCUKTQetG8hI3bG3mW8tEcJq+h+mks8LoeISGUuzU3zU5w2f19NV9pW4vchUcwEQ9z2eJJgKXkvRMLwQD2vHKPMqPuOEweSzJFv9clvwDS0rO9forLzkDmPhcveepMyDzbsxhyhsTLMchLVsSlD4Vk8s2TXm8H1Vf2oib5JOsWcci1rgWJl/eL9oOxwL","originalName":"run_command"}}}', 'LC_TIME': 'es_CO.UTF-8', 'VSCODE_NLS_CONFIG': '{"userLocale":"en-us","osLocale":"en-us","resolvedLanguage":"en","defaultMessagesFile":"/home/akenitoy/Downloads/Antigravity IDE/resources/app/out/nls.messages.json","locale":"en-us","availableLanguages":{}}', 'XDG_SESSION_TYPE': 'wayland', 'SHLVL': '0', 'LD_LIBRARY_PATH': '/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib', 'HOME': '/home/akenitoy', 'CHROME_DESKTOP': 'antigravity-ide.desktop', 'DESKTOP_SESSION': 'ubuntu', 'VSCODE_IPC_HOOK': '/run/user/1000/vscode-28853080-1.10-main.sock', 'ROS_PYTHON_VERSION': '3', 'GNOME_SHELL_SESSION_MODE': 'ubuntu', 'GTK_MODULES': 'gail:atk-bridge', 'PAGER': 'cat', 'LC_MONETARY': 'es_CO.UTF-8', 'MANAGERPID': '1678', 'DBUS_STARTER_BUS_TYPE': 'session', 'SYSTEMD_EXEC_PID': '1827', 'IM_CONFIG_CHECK_ENV': '1', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus,guid=1b40a2eca9dd6020e48e0f436a5ebce7', 'ANTIGRAVITY_AGENT': '1', 'GIO_LAUNCHED_DESKTOP_FILE_PID': '4397', 'IM_CONFIG_PHASE': '1', 'WAYLAND_DISPLAY': 'wayland-0', 'COLCON_PREFIX_PATH': '/home/akenitoy/robot-vision-sim/install', 'ROS_DISTRO': 'humble', 'LOGNAME': 'akenitoy', '_': '/usr/bin/colcon', 'JOURNAL_STREAM': '8:11263', 'ROS_VERSION': '2', 'XDG_SESSION_CLASS': 'user', 'USERNAME': 'akenitoy', 'TERM': 'dumb', 'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'FC_FONTATIONS': '1', 'ROS_LOCALHOST_ONLY': '0', 'ANTIGRAVITY_EDITOR_APP_ROOT': '/home/akenitoy/Downloads/Antigravity IDE/resources/app', 'PATH': '/home/akenitoy/.gemini/antigravity-ide/bin:/opt/ros/humble/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin', 'SESSION_MANAGER': 'local/Robot-Vision-ROS2:@/tmp/.ICE-unix/1827,unix/Robot-Vision-ROS2:/tmp/.ICE-unix/1827', 'INVOCATION_ID': '98af4b30900f453985f3dc9318781832', 'XDG_MENU_PREFIX': 'gnome-', 'LC_ADDRESS': 'es_CO.UTF-8', 'GNOME_SETUP_DISPLAY': ':1', 'XDG_RUNTIME_DIR': '/run/user/1000', 'GDK_BACKEND': 'wayland', 'DISPLAY': ':0', 'LANG': 'en_US.UTF-8', 'XDG_CURRENT_DESKTOP': 'ubuntu:GNOME', 'LC_TELEPHONE': 'es_CO.UTF-8', 'XMODIFIERS': '@im=ibus', 'XDG_SESSION_DESKTOP': 'ubuntu', 'XAUTHORITY': '/run/user/1000/.mutter-Xwaylandauth.WEUES3', 'LS_COLORS': '', 'SSH_AGENT_LAUNCHER': 'gnome-keyring', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'AMENT_PREFIX_PATH': '/opt/ros/humble', 'SHELL': '/bin/bash', 'ANTIGRAVITY_LS_ADDRESS': 'localhost:41455', 'LC_NAME': 'es_CO.UTF-8', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'ubuntu', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'es_CO.UTF-8', 'LC_IDENTIFICATION': 'es_CO.UTF-8', 'GIT_PAGER': 'cat', 'QT_IM_MODULE': 'ibus', 'ANTIGRAVITY_TRAJECTORY_ID': 'c0f3043e-40f4-4d61-ae0e-09b3275f0b99', 'PWD': '/home/akenitoy/robot-vision-sim/build/sim_vision_test', 'LC_ALL': 'en_US.UTF-8', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-ubuntu:/etc/xdg', 'VSCODE_CODE_CACHE_PATH': '/home/akenitoy/.config/Antigravity IDE/CachedData/e0b7a2bcf575cfba10528c4e7c10bd3ce2d7769a', 'DBUS_STARTER_ADDRESS': 'unix:path=/run/user/1000/bus,guid=1b40a2eca9dd6020e48e0f436a5ebce7', 'XDG_DATA_DIRS': '/usr/share/ubuntu:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop', 'PYTHONPATH': '/home/akenitoy/robot-vision-sim/build/sim_vision_test/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages:/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages', 'LC_NUMERIC': 'es_CO.UTF-8', 'LC_PAPER': 'es_CO.UTF-8', 'COLCON': '1', 'ANTIGRAVITY_CSRF_TOKEN': '9f55682b-5b0b-42c4-a193-f80775b3bcdf', 'VSCODE_PID': '4397'}, 'shell': False}
+[5.232297] (-) TimerEvent: {}
+[5.345799] (-) TimerEvent: {}
+[5.516645] (-) TimerEvent: {}
+[5.692310] (-) TimerEvent: {}
+[5.792993] (-) TimerEvent: {}
+[5.897531] (-) TimerEvent: {}
+[5.999444] (-) TimerEvent: {}
+[6.101068] (-) TimerEvent: {}
+[6.213496] (-) TimerEvent: {}
+[6.342677] (-) TimerEvent: {}
+[6.444806] (-) TimerEvent: {}
+[6.548297] (-) TimerEvent: {}
+[6.650467] (-) TimerEvent: {}
+[6.755186] (-) TimerEvent: {}
+[6.866113] (-) TimerEvent: {}
+[6.971839] (-) TimerEvent: {}
+[7.084189] (-) TimerEvent: {}
+[7.195240] (-) TimerEvent: {}
+[7.213037] (sim_vision_test) StdoutLine: {'line': b'running egg_info\n'}
+[7.221140] (sim_vision_test) StdoutLine: {'line': b'creating ../../build/sim_vision_test/sim_vision_test.egg-info\n'}
+[7.224083] (sim_vision_test) StdoutLine: {'line': b'writing ../../build/sim_vision_test/sim_vision_test.egg-info/PKG-INFO\n'}
+[7.224197] (sim_vision_test) StdoutLine: {'line': b'writing dependency_links to ../../build/sim_vision_test/sim_vision_test.egg-info/dependency_links.txt\n'}
+[7.224330] (sim_vision_test) StdoutLine: {'line': b'writing entry points to ../../build/sim_vision_test/sim_vision_test.egg-info/entry_points.txt\n'}
+[7.224447] (sim_vision_test) StdoutLine: {'line': b'writing requirements to ../../build/sim_vision_test/sim_vision_test.egg-info/requires.txt\n'}
+[7.224524] (sim_vision_test) StdoutLine: {'line': b'writing top-level names to ../../build/sim_vision_test/sim_vision_test.egg-info/top_level.txt\n'}
+[7.224843] (sim_vision_test) StdoutLine: {'line': b"writing manifest file '../../build/sim_vision_test/sim_vision_test.egg-info/SOURCES.txt'\n"}
+[7.228034] (sim_vision_test) StdoutLine: {'line': b"reading manifest file '../../build/sim_vision_test/sim_vision_test.egg-info/SOURCES.txt'\n"}
+[7.236154] (sim_vision_test) StdoutLine: {'line': b"writing manifest file '../../build/sim_vision_test/sim_vision_test.egg-info/SOURCES.txt'\n"}
+[7.236469] (sim_vision_test) StdoutLine: {'line': b'running build\n'}
+[7.236758] (sim_vision_test) StdoutLine: {'line': b'running build_py\n'}
+[7.241838] (sim_vision_test) StdoutLine: {'line': b'creating /home/akenitoy/robot-vision-sim/build/sim_vision_test/build\n'}
+[7.242142] (sim_vision_test) StdoutLine: {'line': b'creating /home/akenitoy/robot-vision-sim/build/sim_vision_test/build/lib\n'}
+[7.242498] (sim_vision_test) StdoutLine: {'line': b'creating /home/akenitoy/robot-vision-sim/build/sim_vision_test/build/lib/sim_vision_test\n'}
+[7.242775] (sim_vision_test) StdoutLine: {'line': b'copying sim_vision_test/__init__.py -> /home/akenitoy/robot-vision-sim/build/sim_vision_test/build/lib/sim_vision_test\n'}
+[7.243093] (sim_vision_test) StdoutLine: {'line': b'copying sim_vision_test/vision_sim_node.py -> /home/akenitoy/robot-vision-sim/build/sim_vision_test/build/lib/sim_vision_test\n'}
+[7.243342] (sim_vision_test) StdoutLine: {'line': b'running install\n'}
+[7.247849] (sim_vision_test) StdoutLine: {'line': b'running install_lib\n'}
+[7.249365] (sim_vision_test) StdoutLine: {'line': b'creating /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages/sim_vision_test\n'}
+[7.249734] (sim_vision_test) StdoutLine: {'line': b'copying /home/akenitoy/robot-vision-sim/build/sim_vision_test/build/lib/sim_vision_test/__init__.py -> /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages/sim_vision_test\n'}
+[7.249823] (sim_vision_test) StdoutLine: {'line': b'copying /home/akenitoy/robot-vision-sim/build/sim_vision_test/build/lib/sim_vision_test/vision_sim_node.py -> /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages/sim_vision_test\n'}
+[7.253767] (sim_vision_test) StdoutLine: {'line': b'byte-compiling /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages/sim_vision_test/__init__.py to __init__.cpython-310.pyc\n'}
+[7.254561] (sim_vision_test) StdoutLine: {'line': b'byte-compiling /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages/sim_vision_test/vision_sim_node.py to vision_sim_node.cpython-310.pyc\n'}
+[7.258480] (sim_vision_test) StdoutLine: {'line': b'running install_data\n'}
+[7.259580] (sim_vision_test) StdoutLine: {'line': b'creating /home/akenitoy/robot-vision-sim/install/sim_vision_test/share/ament_index\n'}
+[7.259860] (sim_vision_test) StdoutLine: {'line': b'creating /home/akenitoy/robot-vision-sim/install/sim_vision_test/share/ament_index/resource_index\n'}
+[7.260028] (sim_vision_test) StdoutLine: {'line': b'creating /home/akenitoy/robot-vision-sim/install/sim_vision_test/share/ament_index/resource_index/packages\n'}
+[7.262058] (sim_vision_test) StdoutLine: {'line': b'copying resource/sim_vision_test -> /home/akenitoy/robot-vision-sim/install/sim_vision_test/share/ament_index/resource_index/packages\n'}
+[7.262641] (sim_vision_test) StdoutLine: {'line': b'copying package.xml -> /home/akenitoy/robot-vision-sim/install/sim_vision_test/share/sim_vision_test\n'}
+[7.262785] (sim_vision_test) StdoutLine: {'line': b'running install_egg_info\n'}
+[7.269263] (sim_vision_test) StdoutLine: {'line': b'Copying ../../build/sim_vision_test/sim_vision_test.egg-info to /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/python3.10/site-packages/sim_vision_test-0.0.0-py3.10.egg-info\n'}
+[7.270244] (sim_vision_test) StdoutLine: {'line': b'running install_scripts\n'}
+[7.296166] (-) TimerEvent: {}
+[7.347798] (sim_vision_test) StdoutLine: {'line': b'Installing vision_sim_node script to /home/akenitoy/robot-vision-sim/install/sim_vision_test/lib/sim_vision_test\n'}
+[7.354549] (sim_vision_test) StdoutLine: {'line': b"writing list of installed files to '/home/akenitoy/robot-vision-sim/build/sim_vision_test/install.log'\n"}
+[7.404579] (-) TimerEvent: {}
+[7.517723] (-) TimerEvent: {}
+[7.548630] (sim_vision_test) CommandEnded: {'returncode': 0}
+[7.619023] (-) TimerEvent: {}
+[7.726727] (-) TimerEvent: {}
+[7.762633] (sim_vision_test) JobEnded: {'identifier': 'sim_vision_test', 'rc': 0}
+[7.763898] (-) EventReactorShutdown: {}

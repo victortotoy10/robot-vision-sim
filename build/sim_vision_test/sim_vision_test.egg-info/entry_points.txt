@@ -1,0 +1,3 @@
+[console_scripts]
+vision_sim_node = sim_vision_test.vision_sim_node:main
+
