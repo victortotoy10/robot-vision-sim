@@ -16,7 +16,6 @@ def generate_launch_description():
     launch_dir = os.path.dirname(os.path.abspath(__file__))
     pkg_share = os.path.dirname(launch_dir)
     urdf_file = os.path.join(pkg_share, 'urdf', 'my_robot.urdf')
-    world_file = os.path.join(pkg_share, 'worlds', 'camera_world.sdf')
 
     with open(urdf_file, 'r') as f:
         robot_description = f.read()
@@ -28,6 +27,13 @@ def generate_launch_description():
         description='Ejecutar Gazebo en modo headless (servidor sin GUI 3D)'
     )
 
+    # Launch argument for selecting the world file
+    world_arg = DeclareLaunchArgument(
+        'world',
+        default_value='camera_world',
+        description='Nombre del mundo a cargar (camera_world, racetrack, racetrack_decorated)'
+    )
+
     # Robot State Publisher — broadcasts TF from URDF
     robot_state_publisher = Node(
         package='robot_state_publisher',
@@ -37,12 +43,16 @@ def generate_launch_description():
         output='screen'
     )
 
-    # Gazebo with our custom camera world, optionally headless
+    # Gazebo with our selected world, optionally headless
     # If headless is 'true', we pass '-s -r <world>', otherwise just '-r <world>'
     gz_args = PythonExpression([
-        "'-s -r ' + '" + world_file + "' if '", 
-        LaunchConfiguration('headless'), 
-        "' == 'true' else '-r ' + '" + world_file + "'"
+        "'-s -r ' + '" + pkg_share + "/worlds/' + '",
+        LaunchConfiguration('world'),
+        "' + '.sdf' if '",
+        LaunchConfiguration('headless'),
+        "' == 'true' else '-r ' + '" + pkg_share + "/worlds/' + '",
+        LaunchConfiguration('world'),
+        "' + '.sdf'"
     ])
 
     gazebo = IncludeLaunchDescription(
@@ -90,6 +100,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         headless_arg,
+        world_arg,
         robot_state_publisher,
         gazebo,
         spawn_robot,
