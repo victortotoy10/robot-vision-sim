@@ -187,29 +187,32 @@ Para que aplicaciones como la GUI de Gazebo, RViz y OpenCV no fallen al iniciar 
 
 #### 3. Ejecución 100% Headless por GPU (Sin servidor X11)
 Si solo deseas entrenar un algoritmo de control o visión computacional de forma autónoma (sin ver físicamente la pantalla en tiempo real), puedes habilitar **EGL Headless Rendering** en Gazebo Sim.
-La GPU NVIDIA T4 renderizará la imagen del sensor de la cámara internamente en su memoria de video (VRAM) y publicará el tema de ROS `/camera/image_raw` sin necesidad de inicializar interfaces gráficas o VNC. 
+La GPU NVIDIA T4 renderizará la imagen del sensor de la cámara internamente en su memoria de video (VRAM) y publicará el tema de ROS `/camera/image_raw` sin necesidad de inicializar interfaces gráficas o VNC.
 
 ---
 
-### 8.3. Hoja de Ruta para Navegación Autónoma y Reconocimiento de Señales
+### 8.3. Plan de Autonomía Requerido vs. Extensiones Opcionales
 
-El diseño modular de este proyecto permite migrar de un control por teclado (teleoperación) a un control 100% autónomo y análisis de señales:
+De acuerdo con las indicaciones de la cátedra, el **único requerimiento obligatorio** del proyecto es lograr que el auto navegue de forma **100% autónoma en la pista o circuito** (seguimiento de línea / Line Follower). El reconocimiento de señales de tránsito es una extensión opcional.
+
+Para cumplir con este requisito obligatorio de manera fluida y sin tirones (evitando el lag de renderizado en máquinas virtuales locales), se propone el siguiente esquema modular:
 
 ```mermaid
 flowchart LR
     A[Cámara del Robot] -->|/camera/image_raw| B(Nodo OpenCV)
-    B -->|Cálculo de Error| C(Controlador PID)
-    B -->|Detección de Señales| D(Algoritmo YOLO / Plantillas)
-    C -->|Publica /cmd_vel| E[Base del Robot]
+    B -->|Cálculo de Error| C(Controlador PID de Dirección)
+    C -->|Publica /cmd_vel| D[Base del Robot]
 ```
 
-1.  **Navegación Autónoma (Controlador de Dirección):**
-    *   Reemplazaremos el nodo de teleoperación por un script de control autónomo (ej. `line_follower_controller.py`).
-    *   Este script se suscribirá al error en píxeles publicado por el nodo OpenCV.
-    *   Implementará un algoritmo de control **PID (Proporcional, Integral, Derivativo)** que ajustará automáticamente la velocidad lineal ($v_x$) y la velocidad angular ($w_z$) del robot para mantener el error en $0$.
-    *   Publicará continuamente los comandos de velocidad al tema `/cmd_vel`.
-2.  **Reconocimiento de Señales de Tránsito:**
-    *   **Método OpenCV Ligero:** Uso de detección de contornos, clasificación por descriptores de forma (círculos, triángulos) y filtrado de colores específicos (rojo para STOP, azul para flechas de giro).
-    *   **Método Deep Learning (Recomendado con GPU en AWS):** Integración de un modelo ligero de detección de objetos en tiempo real como **YOLOv8-nano** o **YOLOv10-nano**.
-    *   El modelo procesará el frame de la cámara, identificará la señal (STOP, límite de velocidad, curva peligrosa) y enviará una señal al controlador PID para detener el vehículo, reducir la velocidad o tomar un desvío.
+1.  **Navegación Autónoma basada en Visión por Cámara (Requerimiento Obligatorio):**
+    *   **Guiado por Cámara (No sensores físicos de línea):** A diferencia de un seguidor de línea clásico con sensores infrarrojos en la base, este sistema utiliza la **transmisión de video de la cámara simulada** para tomar decisiones de control.
+    *   **Procesamiento de Imagen:** El nodo procesa cada frame con OpenCV (redimensionamiento, máscara de color HSV en la región de interés ROI, y cálculo de momentos) para determinar el centroide del camino en la imagen.
+    *   **Controlador de Dirección (PID):** El script autónomo se suscribe a la desviación calculada por el nodo de visión (la distancia en píxeles del centroide al centro del frame) y calcula mediante un algoritmo **PID (Proporcional, Integral, Derivativo)** las velocidades angular ($w_z$) y lineal ($v_x$) necesarias.
+    *   **Publicación:** Se publican los comandos directamente al tema `/cmd_vel` de la base del robot.
+    *   *Fluidez de Simulación:* Ejecutar este lazo cerrado de procesamiento de video en tiempo real en una instancia con aceleración por GPU (AWS G4dn) garantiza que la física de Gazebo y el procesamiento de OpenCV sincronicen a 30+ FPS estables sin pérdida de paquetes ni tirones de procesamiento.
+
+2.  **Reconocimiento de Señales de Tránsito (Extensión Opcional / Fuera del Alcance Mínimo):**
+    *   *Nota:* Esta característica no es requerida por el profesor para la entrega básica.
+    *   **Alternativa Ligera:** Detección de contornos y colores usando OpenCV tradicional (por ejemplo, buscar octágonos rojos para detenerse ante una señal de STOP).
+    *   **Alternativa Avanzada (Deep Learning):** Integración opcional de un modelo ligero como **YOLOv8-nano** para inferencia de señales en tiempo real. Debido al costo computacional de YOLO, esta opción requeriría obligatoriamente la GPU de la instancia de AWS para no degradar los FPS de la simulación.
     *   *Nota:* Correr un modelo YOLO en CPU dentro de una VM suele ir a 1-2 FPS. En una instancia `g4dn.xlarge` de AWS con GPU, se ejecutará de forma fluida a 30+ FPS.
