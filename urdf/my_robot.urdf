@@ -162,8 +162,9 @@
   <joint name="camera_joint" type="fixed">
     <parent link="base_link"/>
     <child link="camera_link"/>
-    <!-- Mount the camera at the front of the robot, higher and tilted down -->
-    <origin xyz="0.15 0 0.15" rpy="0 0.35 0"/>
+    <!-- Camara: adelante, mas elevada, inclinada 45 grados hacia abajo -->
+    <!-- para ver las lineas del asfalto de la pista directamente enfrente -->
+    <origin xyz="0.18 0 0.18" rpy="0 0.785 0"/>
   </joint>
 
   <link name="camera_link">

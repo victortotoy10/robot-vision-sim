@@ -8,173 +8,158 @@ import numpy as np
 import time
 import os
 
+
 class VisionSimNode(Node):
     def __init__(self):
         super().__init__('vision_sim_node')
-        
-        # Suscripción al tema de imagen de la cámara
+
         self.subscription = self.create_subscription(
-            Image,
-            '/camera/image_raw',
-            self.image_callback,
-            10
-        )
-        
-        # Publicador de comandos de velocidad para control autónomo
-        self.cmd_vel_pub = self.create_publisher(
-            Twist,
-            '/cmd_vel',
-            10
-        )
-        
-        # Puente de OpenCV a ROS
+            Image, '/camera/image_raw', self.image_callback, 10)
+
+        self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         self.bridge = CvBridge()
-        
-        # Parámetros HSV configurables para segmentación de líneas
-        # Por defecto, rango para detectar amarillo/naranja en HSV
-        self.declare_parameter('hsv_lower', [15, 100, 100])
-        self.declare_parameter('hsv_upper', [45, 255, 255])
-        
-        # Parámetro para mostrar la ventana de depuración (cv2.imshow)
+
+        # HSV (opcional, si use_hsv=true)
+        self.declare_parameter('hsv_lower', [0, 0, 180])
+        self.declare_parameter('hsv_upper', [180, 60, 255])
+        self.declare_parameter('use_hsv', False)
+        # Umbral de brillo para lineas blancas (grayscale) - mas robusto para pista F1
+        self.declare_parameter('brightness_threshold', 160)
+
         self.declare_parameter('show_image', False)
-        
-        # Parámetros del Controlador PID para seguimiento autónomo de línea
         self.declare_parameter('follow_line', False)
-        self.declare_parameter('kp', 0.005)
+
+        # PID
+        self.declare_parameter('kp', 0.008)
         self.declare_parameter('ki', 0.0)
-        self.declare_parameter('kd', 0.001)
-        self.declare_parameter('base_speed', 0.3)
-        self.declare_parameter('max_angular_speed', 1.0)
-        
-        # Variables de estado del PID
+        self.declare_parameter('kd', 0.002)
+        self.declare_parameter('base_speed', 0.4)
+        self.declare_parameter('max_angular_speed', 1.5)
+
+        # Estado PID
         self.prev_error = 0.0
         self.integral = 0.0
         self.last_control_time = self.get_clock().now()
-        
-        # Variables para calcular FPS
+
+        # FPS
         self.last_time = time.time()
         self.fps_rolling = 0.0
-        
-        self.get_logger().info("Nodo vision_sim_node iniciado. Esperando imágenes...")
+
+        # Estado de perdida de linea
+        self.frames_no_line = 0
+        self.last_known_side = 1  # +1=derecha, -1=izquierda
+
+        self.get_logger().info("VisionSimNode iniciado. Detectando lineas de pista F1...")
 
     def image_callback(self, msg):
-        # Medir tiempo para cálculo de FPS
-        current_time = time.time()
-        dt = current_time - self.last_time
-        self.last_time = current_time
+        t = time.time()
+        dt = t - self.last_time
+        self.last_time = t
         fps = 1.0 / dt if dt > 0 else 0.0
-        # Suavizar FPS para evitar lecturas ruidosas
         self.fps_rolling = 0.9 * self.fps_rolling + 0.1 * fps if self.fps_rolling > 0 else fps
-        
+
         try:
-            # Conversión de mensaje ROS a OpenCV usando CvBridge
             frame = self.bridge.imgmsg_to_cv2(msg, 'bgr8')
-            
-            # Redimensionamiento para bajo consumo
-            frame_resized = cv2.resize(frame, (320, 240))
-            h, w, _ = frame_resized.shape
-            
-            # Procesamiento de Región de Interés (ROI): bottom 40%
-            roi_start_y = int(0.6 * h)
-            roi = frame_resized[roi_start_y:, :]
-            
-            # Conversión a HSV y máscara
-            hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-            
-            # Obtener parámetros de límites HSV
-            lower_hsv = np.array(self.get_parameter('hsv_lower').value, dtype=np.uint8)
-            upper_hsv = np.array(self.get_parameter('hsv_upper').value, dtype=np.uint8)
-            
-            mask = cv2.inRange(hsv, lower_hsv, upper_hsv)
-            
-            # Cálculo de centroide mediante momentos
-            moments = cv2.moments(mask)
-            
+            frame = cv2.resize(frame, (320, 240))
+            h, w = frame.shape[:2]
+
+            # ROI: 60% inferior donde estan las lineas de la pista
+            roi = frame[int(0.4 * h):, :]
+            rh, rw = roi.shape[:2]
+
+            # Deteccion de lineas
+            if self.get_parameter('use_hsv').value:
+                hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+                lo = np.array(self.get_parameter('hsv_lower').value, dtype=np.uint8)
+                hi = np.array(self.get_parameter('hsv_upper').value, dtype=np.uint8)
+                mask = cv2.inRange(hsv, lo, hi)
+            else:
+                # Umbral de brillo - detecta lineas blancas sobre asfalto oscuro
+                gray = cv2.GaussianBlur(cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY), (5, 5), 0)
+                thr = self.get_parameter('brightness_threshold').value
+                _, mask = cv2.threshold(gray, thr, 255, cv2.THRESH_BINARY)
+
+            # Limpieza morfologica
+            k = np.ones((3, 3), np.uint8)
+            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, k)
+            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, k)
+
+            # Centroide
+            M = cv2.moments(mask)
+            cx = rw // 2
             line_detected = False
-            cx = w // 2 # Valor por defecto si no hay píxeles segmentados
-            if moments["m00"] > 0:
-                cx = int(moments["m10"] / moments["m00"])
+            if M['m00'] > 500:
+                cx = int(M['m10'] / M['m00'])
                 line_detected = True
-            
-            # Cálculo del error
-            error = cx - (w // 2)
-            
-            # Calcular tiempo delta para el PID usando tiempo de simulación de ROS
+                self.frames_no_line = 0
+                self.last_known_side = 1 if cx > rw // 2 else -1
+            else:
+                self.frames_no_line += 1
+
+            error = cx - rw // 2
+
+            # PID
             now = self.get_clock().now()
             dt_pid = (now - self.last_control_time).nanoseconds / 1e9
             self.last_control_time = now
-            
-            # Algoritmo PID
-            if dt_pid > 0.0:
-                derivative = (error - self.prev_error) / dt_pid
-                self.integral += error * dt_pid
-            else:
-                derivative = 0.0
-            
-            # Limitar la parte integral para evitar windup
-            self.integral = max(min(self.integral, 50.0), -50.0)
+            deriv = (error - self.prev_error) / dt_pid if dt_pid > 0 else 0.0
+            self.integral = float(np.clip(self.integral + error * dt_pid, -100.0, 100.0))
             self.prev_error = error
-            
+
             kp = self.get_parameter('kp').value
             ki = self.get_parameter('ki').value
             kd = self.get_parameter('kd').value
-            
-            steering_value = kp * error + ki * self.integral + kd * derivative
-            
-            # Generar comandos de velocidad si está en modo autónomo
-            follow_line = self.get_parameter('follow_line').value
-            lin_speed = 0.0
-            ang_speed = 0.0
-            
-            if follow_line:
+            steering = kp * error + ki * self.integral + kd * deriv
+
+            # Comandos de velocidad
+            follow = self.get_parameter('follow_line').value
+            lin, ang = 0.0, 0.0
+
+            if follow:
                 twist = Twist()
+                base = self.get_parameter('base_speed').value
+                max_ang = self.get_parameter('max_angular_speed').value
+
                 if not line_detected:
-                    # Si perdemos la línea por completo, nos detenemos y rotamos suavemente 
-                    # hacia el último lado conocido para intentar recuperarla
-                    twist.linear.x = 0.0
-                    if self.prev_error > 0:
-                        twist.angular.z = -0.3  # rotar a la derecha
-                    else:
-                        twist.angular.z = 0.3   # rotar a la izquierda
+                    twist.linear.x = 0.05
+                    twist.angular.z = 0.5 * float(self.last_known_side)
+                    if self.frames_no_line > 30:
+                        twist.linear.x = 0.0
+                        twist.angular.z = 0.6 * float(self.last_known_side)
                 else:
-                    base_speed = self.get_parameter('base_speed').value
-                    max_angular_speed = self.get_parameter('max_angular_speed').value
-                    
-                    # Giro del robot (si el error es positivo -> línea a la derecha -> girar a la derecha)
-                    angular_z = -steering_value
-                    twist.angular.z = max(min(angular_z, max_angular_speed), -max_angular_speed)
-                    
-                    # Velocidad lineal: se reduce proporcionalmente a la desviación (error)
-                    # En recta va a velocidad máxima, en curvas reduce la velocidad.
-                    speed_scale = max(0.0, 1.0 - (abs(error) / (w // 2)))
-                    twist.linear.x = base_speed * speed_scale
-                
+                    ratio = abs(error) / (rw // 2)
+                    twist.linear.x = base * max(0.2, 1.0 - 0.8 * ratio)
+                    twist.angular.z = float(np.clip(-steering, -max_ang, max_ang))
+
                 self.cmd_vel_pub.publish(twist)
-                lin_speed = twist.linear.x
-                ang_speed = twist.angular.z
-            
-            # Impresión por consola de FPS, error y comandos de velocidad si está en modo autónomo
-            if follow_line:
-                print(f"FPS: {self.fps_rolling:.1f} | Error: {error:4d} px | Velocidad -> Lin: {lin_speed:.2f} m/s, Ang: {ang_speed:.2f} rad/s", flush=True)
+                lin, ang = twist.linear.x, twist.angular.z
+
+            # Consola
+            st = "LINEA OK" if line_detected else f"SIN LINEA ({self.frames_no_line}f)"
+            if follow:
+                print(f"FPS:{self.fps_rolling:4.1f} | {st} | cx={cx:3d} err={error:+4d}px | Lin:{lin:.2f} Ang:{ang:+.2f}", flush=True)
             else:
-                print(f"FPS: {self.fps_rolling:.1f} | Error: {error:4d} px | Autonomo: INACTIVO (teleop/teclado)", flush=True)
-            
-            # Ventana opcional de depuración con cv2.imshow
-            show_image = self.get_parameter('show_image').value
-            if show_image and 'DISPLAY' in os.environ:
-                # Dibujar centroide y error en la imagen para depuración visual
-                debug_frame = roi.copy()
+                print(f"FPS:{self.fps_rolling:4.1f} | {st} | cx={cx:3d} err={error:+4d}px | AUTONOMO: INACTIVO", flush=True)
+
+            # Visualizacion
+            if self.get_parameter('show_image').value and 'DISPLAY' in os.environ:
+                dbg = roi.copy()
+                overlay = np.zeros_like(roi)
+                overlay[mask > 0] = (0, 220, 0)
+                dbg = cv2.addWeighted(dbg, 0.7, overlay, 0.3, 0)
                 if line_detected:
-                    cv2.circle(debug_frame, (cx, int(0.2 * h)), 5, (0, 255, 0), -1)
-                # Dibujar línea central
-                cv2.line(debug_frame, (w // 2, 0), (w // 2, int(0.4 * h)), (255, 0, 0), 1)
-                
-                cv2.imshow("ROI original", debug_frame)
-                cv2.imshow("Mascara HSV", mask)
+                    cv2.circle(dbg, (cx, rh // 2), 8, (0, 0, 255), -1)
+                cv2.line(dbg, (rw // 2, 0), (rw // 2, rh), (255, 0, 0), 2)
+                cv2.arrowedLine(dbg, (rw // 2, rh // 2), (cx, rh // 2), (0, 255, 255), 2)
+                color = (0, 200, 0) if line_detected else (0, 0, 255)
+                cv2.putText(dbg, st, (5, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+                cv2.imshow("ROI original", dbg)
+                cv2.imshow("Mascara deteccion", mask)
                 cv2.waitKey(1)
-                
+
         except Exception as e:
-            self.get_logger().error(f"Error al procesar la imagen: {e}")
+            self.get_logger().error(f"Error: {e}")
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -182,11 +167,12 @@ def main(args=None):
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        node.get_logger().info("Apagando nodo de visión...")
+        pass
     finally:
         cv2.destroyAllWindows()
         node.destroy_node()
         rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
