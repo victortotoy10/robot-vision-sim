@@ -9,7 +9,7 @@ import os
 import torch
 import torch.nn as nn
 
-# Modelo CNN con 2 salidas (velocidad y direccion)
+# Modelo CNN con 2 salidas
 class RacerCNN(nn.Module):
     def __init__(self):
         super(RacerCNN, self).__init__()
@@ -54,7 +54,6 @@ class NeuralPilotNode(Node):
 
         if not os.path.exists(model_path):
             self.get_logger().error(f"ERROR: No se encontro el archivo del modelo en {model_path}")
-            self.get_logger().error("Primero debes grabar datos y entrenar el modelo con train_cnn.py")
             raise FileNotFoundError("Modelo racer_model.pth no encontrado.")
 
         self.model = RacerCNN()
@@ -65,7 +64,7 @@ class NeuralPilotNode(Node):
         self.sub = self.create_subscription(
             Image, '/camera/image_raw', self.image_callback, 10)
 
-        self.get_logger().info("Autopiloto de Red Neuronal Multivariable (Velocidad y Direccion) iniciado.")
+        self.get_logger().info("Autopiloto de Red Neuronal (Ackermann con Reversa) iniciado.")
 
     def image_callback(self, msg):
         try:
@@ -82,11 +81,12 @@ class NeuralPilotNode(Node):
                 prediction = self.model(img_tensor)
                 outputs = prediction.cpu().numpy()[0]
 
-            # El modelo predice velocidad (outputs[0]) y direccion (outputs[1])
-            predicted_linear_x = float(outputs[0])
-            predicted_angular_z = float(outputs[1])
+            # --- DESNORMALIZACIÓN DE ESCALAS ---
+            # Multiplicamos por la inversa de la normalizacion para restaurar valores reales
+            predicted_linear_x = float(outputs[0]) * 2.0
+            predicted_angular_z = float(outputs[1]) * 3.0
 
-            # Publicar velocidades (con clips de seguridad para evitar descontrol)
+            # Publicar velocidades
             twist = Twist()
             twist.linear.x = float(np.clip(predicted_linear_x, -0.4, 2.0))
             twist.angular.z = float(np.clip(predicted_angular_z, -3.0, 3.0))

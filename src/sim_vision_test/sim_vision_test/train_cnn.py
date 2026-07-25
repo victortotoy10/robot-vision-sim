@@ -8,11 +8,10 @@ import cv2
 import os
 import sys
 
-# Modelo CNN multivariable: predice velocidad y direccion
+# Modelo CNN multivariable
 class RacerCNN(nn.Module):
     def __init__(self):
         super(RacerCNN, self).__init__()
-        # Entrada: (3 channels, 120 height, 160 width)
         self.conv = nn.Sequential(
             nn.Conv2d(3, 24, kernel_size=5, stride=2), # 120x160 -> 58x78
             nn.ReLU(),
@@ -31,7 +30,7 @@ class RacerCNN(nn.Module):
             nn.ReLU(),
             nn.Linear(100, 50),
             nn.ReLU(),
-            nn.Linear(50, 2) # Dos salidas: [linear_x (velocidad), angular_z (giro)]
+            nn.Linear(50, 2) # [linear_x, angular_z]
         )
 
     def forward(self, x):
@@ -52,11 +51,16 @@ class RacerDataset(Dataset):
         image = cv2.imread(img_name)
         # Normalizar imagen
         image = image.astype(np.float32) / 255.0
-        image = np.transpose(image, (2, 0, 1)) # HWC -> CHW
+        image = np.transpose(image, (2, 0, 1))
 
         linear_x = float(self.data_df.iloc[idx, 1])
         angular_z = float(self.data_df.iloc[idx, 2])
-        targets = np.array([linear_x, angular_z], dtype=np.float32)
+
+        # --- NORMALIZACIÓN DE ESCALA DE TARGETS ---
+        # Escalamos ambos al rango [-1.0, 1.0] para que pesen igual en la loss
+        linear_x_norm = linear_x / 2.0
+        angular_z_norm = angular_z / 3.0
+        targets = np.array([linear_x_norm, angular_z_norm], dtype=np.float32)
 
         return torch.tensor(image), torch.tensor(targets, dtype=torch.float32)
 
@@ -66,30 +70,28 @@ def train():
 
     if not os.path.exists(csv_path):
         print(f"ERROR: No se encontro el archivo de datos {csv_path}")
-        print("Graba algunos datos de entrenamiento primero.")
         sys.exit(1)
 
     print("Cargando dataset...")
     df = pd.read_csv(csv_path)
 
-    # --- BALANCEO INTELIGENTE MULTIVARIABLE ---
+    # --- BALANCEO DE DATOS ---
     rectas = df[(df['angular_z'].abs() < 0.05) & (df['linear_x'] > 0.0)]
     curvas = df[df['angular_z'].abs() >= 0.05]
-    reversa = df[df['linear_x'] < -0.01]  # Guardar TODAS las maniobras de marcha atras
+    reversa = df[df['linear_x'] < -0.01]
     detenido = df[(df['linear_x'].abs() < 0.01) & (df['angular_z'].abs() < 0.01)]
 
-    # Reducimos las rectas al 15% y los frames quietos al 10% para balancear
+    # Filtramos las rectas y quietas redundantes
     rectas_filtradas = rectas.sample(frac=0.15, random_state=42) if len(rectas) > 0 else rectas
     detenidos_filtrados = detenido.sample(frac=0.10, random_state=42) if len(detenido) > 0 else detenido
 
     df_balanceado = pd.concat([rectas_filtradas, detenidos_filtrados, curvas, reversa]).sample(frac=1.0, random_state=42).reset_index(drop=True)
 
     print(f"Dataset original: {len(df)} frames")
-    print(f"Dataset balanceado -> Total: {len(df_balanceado)} frames (Curvas: {len(curvas)} | Reversas: {len(reversa)})")
+    print(f"Dataset balanceado -> Total: {len(df_balanceado)} (Curvas: {len(curvas)} | Reversas: {len(reversa)})")
     
     dataset = RacerDataset(dataframe=df_balanceado, root_dir=data_dir)
     
-    # Division Entrenamiento (80%) / Validacion (20%)
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
     train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
@@ -102,9 +104,8 @@ def train():
 
     model = RacerCNN().to(device)
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.0005) # Aprendizaje mas fino para 2 salidas
+    optimizer = optim.Adam(model.parameters(), lr=0.0005)
 
-    # 80 epocas para asimilar la marcha atras
     epochs = 80
     print("Iniciando entrenamiento en la GPU...")
 
@@ -120,7 +121,6 @@ def train():
             optimizer.step()
             train_loss += loss.item() * images.size(0)
 
-        # Validacion
         model.eval()
         val_loss = 0.0
         with torch.no_grad():
@@ -136,7 +136,6 @@ def train():
         if (epoch+1) % 5 == 0 or epoch == 0:
             print(f"Epoch {epoch+1:02d}/{epochs:02d} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f}")
 
-    # Guardar modelo
     model_path = os.path.join(data_dir, 'racer_model.pth')
     torch.save(model.state_dict(), model_path)
     print(f"Entrenamiento completado. Modelo guardado en {model_path}")
