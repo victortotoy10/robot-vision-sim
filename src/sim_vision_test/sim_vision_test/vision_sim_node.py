@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
+from geometry_msgs.msg import Twist
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
@@ -19,6 +20,13 @@ class VisionSimNode(Node):
             10
         )
         
+        # Publicador de comandos de velocidad para control autónomo
+        self.cmd_vel_pub = self.create_publisher(
+            Twist,
+            '/cmd_vel',
+            10
+        )
+        
         # Puente de OpenCV a ROS
         self.bridge = CvBridge()
         
@@ -29,6 +37,19 @@ class VisionSimNode(Node):
         
         # Parámetro para mostrar la ventana de depuración (cv2.imshow)
         self.declare_parameter('show_image', False)
+        
+        # Parámetros del Controlador PID para seguimiento autónomo de línea
+        self.declare_parameter('follow_line', False)
+        self.declare_parameter('kp', 0.005)
+        self.declare_parameter('ki', 0.0)
+        self.declare_parameter('kd', 0.001)
+        self.declare_parameter('base_speed', 0.3)
+        self.declare_parameter('max_angular_speed', 1.0)
+        
+        # Variables de estado del PID
+        self.prev_error = 0.0
+        self.integral = 0.0
+        self.last_control_time = self.get_clock().now()
         
         # Variables para calcular FPS
         self.last_time = time.time()
@@ -69,22 +90,81 @@ class VisionSimNode(Node):
             # Cálculo de centroide mediante momentos
             moments = cv2.moments(mask)
             
+            line_detected = False
             cx = w // 2 # Valor por defecto si no hay píxeles segmentados
             if moments["m00"] > 0:
                 cx = int(moments["m10"] / moments["m00"])
+                line_detected = True
             
             # Cálculo del error
             error = cx - (w // 2)
             
-            # Impresión por consola de FPS y error
-            print(f"FPS: {self.fps_rolling:.1f} | Error: {error} px", flush=True)
+            # Calcular tiempo delta para el PID usando tiempo de simulación de ROS
+            now = self.get_clock().now()
+            dt_pid = (now - self.last_control_time).nanoseconds / 1e9
+            self.last_control_time = now
+            
+            # Algoritmo PID
+            if dt_pid > 0.0:
+                derivative = (error - self.prev_error) / dt_pid
+                self.integral += error * dt_pid
+            else:
+                derivative = 0.0
+            
+            # Limitar la parte integral para evitar windup
+            self.integral = max(min(self.integral, 50.0), -50.0)
+            self.prev_error = error
+            
+            kp = self.get_parameter('kp').value
+            ki = self.get_parameter('ki').value
+            kd = self.get_parameter('kd').value
+            
+            steering_value = kp * error + ki * self.integral + kd * derivative
+            
+            # Generar comandos de velocidad si está en modo autónomo
+            follow_line = self.get_parameter('follow_line').value
+            lin_speed = 0.0
+            ang_speed = 0.0
+            
+            if follow_line:
+                twist = Twist()
+                if not line_detected:
+                    # Si perdemos la línea por completo, nos detenemos y rotamos suavemente 
+                    # hacia el último lado conocido para intentar recuperarla
+                    twist.linear.x = 0.0
+                    if self.prev_error > 0:
+                        twist.angular.z = -0.3  # rotar a la derecha
+                    else:
+                        twist.angular.z = 0.3   # rotar a la izquierda
+                else:
+                    base_speed = self.get_parameter('base_speed').value
+                    max_angular_speed = self.get_parameter('max_angular_speed').value
+                    
+                    # Giro del robot (si el error es positivo -> línea a la derecha -> girar a la derecha)
+                    angular_z = -steering_value
+                    twist.angular.z = max(min(angular_z, max_angular_speed), -max_angular_speed)
+                    
+                    # Velocidad lineal: se reduce proporcionalmente a la desviación (error)
+                    # En recta va a velocidad máxima, en curvas reduce la velocidad.
+                    speed_scale = max(0.0, 1.0 - (abs(error) / (w // 2)))
+                    twist.linear.x = base_speed * speed_scale
+                
+                self.cmd_vel_pub.publish(twist)
+                lin_speed = twist.linear.x
+                ang_speed = twist.angular.z
+            
+            # Impresión por consola de FPS, error y comandos de velocidad si está en modo autónomo
+            if follow_line:
+                print(f"FPS: {self.fps_rolling:.1f} | Error: {error:4d} px | Velocidad -> Lin: {lin_speed:.2f} m/s, Ang: {ang_speed:.2f} rad/s", flush=True)
+            else:
+                print(f"FPS: {self.fps_rolling:.1f} | Error: {error:4d} px | Autonomo: INACTIVO (teleop/teclado)", flush=True)
             
             # Ventana opcional de depuración con cv2.imshow
             show_image = self.get_parameter('show_image').value
             if show_image and 'DISPLAY' in os.environ:
                 # Dibujar centroide y error en la imagen para depuración visual
                 debug_frame = roi.copy()
-                if moments["m00"] > 0:
+                if line_detected:
                     cv2.circle(debug_frame, (cx, int(0.2 * h)), 5, (0, 255, 0), -1)
                 # Dibujar línea central
                 cv2.line(debug_frame, (w // 2, 0), (w // 2, int(0.4 * h)), (255, 0, 0), 1)
