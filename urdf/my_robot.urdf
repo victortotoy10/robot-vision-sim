@@ -162,9 +162,9 @@
   <joint name="camera_joint" type="fixed">
     <parent link="base_link"/>
     <child link="camera_link"/>
-    <!-- Posicion basada en referencia ar-tu-do: baja (9.5cm), adelante (21cm) -->
-    <!-- Inclinacion suave de 15 grados hacia abajo para ver el suelo de la pista -->
-    <origin xyz="0.21 0 0.095" rpy="0 0.26 0"/>
+    <!-- Posicion baja y adelantada, con inclinacion de 5 grados (0.08 rad) -->
+    <!-- para ver la pista mucho mas adelante y anticipar las curvas -->
+    <origin xyz="0.21 0 0.095" rpy="0 0.08 0"/>
   </joint>
 
   <link name="camera_link">
