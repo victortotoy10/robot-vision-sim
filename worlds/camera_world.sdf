@@ -165,7 +165,6 @@
         </visual>
       </link>
     </model>
-zn&UH%M~!$
     <!-- A couple of obstacles behind so the lidar still has a 360 view -->
     <model name="grey_box_back">
       <static>true</static>
