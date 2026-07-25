@@ -49,7 +49,7 @@ class VisionSimNode(Node):
         self.frames_no_line = 0
         self.last_known_side = 1  # +1=derecha, -1=izquierda
 
-        self.get_logger().info("VisionSimNode iniciado con recuperacion de colisiones...")
+        self.get_logger().info("VisionSimNode iniciado con direccion dinamica amortiguada...")
 
     def image_callback(self, msg):
         t = time.time()
@@ -127,21 +127,30 @@ class VisionSimNode(Node):
                         twist.angular.z = 0.5 * float(self.last_known_side)
                     elif self.frames_no_line <= 35:
                         # Fase 2: Asumir choque contra pared. ¡Marcha atras (reversa)!
-                        # Retrocedemos girando hacia el lado opuesto para salir del atasco
                         twist.linear.x = -0.25
                         twist.angular.z = -0.6 * float(self.last_known_side)
                     else:
                         # Fase 3: Detenerse y rotar buscando la linea de nuevo
                         twist.linear.x = 0.0
                         twist.angular.z = 0.7 * float(self.last_known_side)
-                        # Reiniciar bucle si pasa demasiado tiempo perdido
                         if self.frames_no_line > 80:
                             self.frames_no_line = 11
                 else:
                     # Conduccion normal
                     ratio = abs(error) / (rw // 2)
+                    # Velocidad lineal decae proporcionalmente en curvas cerradas
                     twist.linear.x = base * max(0.2, 1.0 - 0.8 * ratio)
-                    twist.angular.z = float(np.clip(-steering, -max_ang, max_ang))
+
+                    # --- DIRECCION DINAMICA AMORTIGUADA (Estabilidad F1) ---
+                    # A mayor velocidad lineal, reducimos proporcionalmente el limite angular maximo
+                    # para evitar que el carro de traccion diferencial derrape bruscamente (spinning)
+                    current_max_ang = max_ang
+                    if twist.linear.x > 0.3:
+                        speed_factor = twist.linear.x / base
+                        # Amortiguamos hasta un 50% el rango de giro a maxima velocidad
+                        current_max_ang = max_ang * (1.0 - 0.5 * speed_factor)
+
+                    twist.angular.z = float(np.clip(-steering, -current_max_ang, current_max_ang))
 
                 self.cmd_vel_pub.publish(twist)
                 lin, ang = twist.linear.x, twist.angular.z
