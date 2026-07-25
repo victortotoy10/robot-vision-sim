@@ -110,7 +110,8 @@ def main(args=None):
     except FileNotFoundError:
         pass
     finally:
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
