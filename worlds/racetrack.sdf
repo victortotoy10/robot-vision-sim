@@ -73,7 +73,7 @@
           <cast_shadows>false</cast_shadows>
           <geometry>
             <mesh>
-              <uri>model://meshes/track.dae</uri>
+              <uri>../meshes/track.dae</uri>
             </mesh>
           </geometry>
         </visual>
@@ -100,7 +100,7 @@
         <collision name="walls-collision">
           <geometry>
             <mesh>
-              <uri>model://meshes/walls.dae</uri>
+              <uri>../meshes/walls.dae</uri>
             </mesh>
           </geometry>
           <surface>

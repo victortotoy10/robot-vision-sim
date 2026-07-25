@@ -10,16 +10,12 @@ from ament_index_python.packages import get_package_share_directory
 def generate_launch_description():
 
     # Resolve URDF / world relative to this launch file's location.
+    # Works both when running from the source tree (no colcon needed) and
+    # after `colcon build` because the installed share/<pkg>/launch/ has
+    # urdf/ and worlds/ as siblings — same layout as the source tree.
     launch_dir = os.path.dirname(os.path.abspath(__file__))
     pkg_share = os.path.dirname(launch_dir)
     urdf_file = os.path.join(pkg_share, 'urdf', 'my_robot.urdf')
-
-    # Configurar variables de entorno para que Gazebo encuentre las mallas (.dae)
-    for env_var in ['GZ_SIM_RESOURCE_PATH', 'IGN_GAZEBO_RESOURCE_PATH']:
-        if env_var in os.environ:
-            os.environ[env_var] += os.pathsep + pkg_share
-        else:
-            os.environ[env_var] = pkg_share
 
     with open(urdf_file, 'r') as f:
         robot_description = f.read()
