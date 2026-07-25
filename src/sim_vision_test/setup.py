@@ -20,7 +20,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'vision_sim_node = sim_vision_test.vision_sim_node:main'
+            'vision_sim_node = sim_vision_test.vision_sim_node:main',
+            'data_recorder_node = sim_vision_test.data_recorder:main',
+            'neural_pilot_node = sim_vision_test.neural_pilot_node:main'
         ],
     },
 )

@@ -255,9 +255,11 @@
   <joint name="camera_joint" type="fixed">
     <parent link="chassis"/>
     <child link="camera_link"/>
-    <!-- Camara baja a 9.5cm, adelantada 21cm, inclinacion de 5 grados hacia abajo -->
-    <origin xyz="0.21 0 0.095" rpy="0 0.08 0"/>
+    <!-- Camara elevada a 14cm para evitar quedar dentro del chasis visual, -->
+    <!-- adelantada 21cm, inclinacion de 5 grados hacia abajo -->
+    <origin xyz="0.21 0 0.14" rpy="0 0.08 0"/>
   </joint>
+
 
   <link name="camera_link">
     <visual>
