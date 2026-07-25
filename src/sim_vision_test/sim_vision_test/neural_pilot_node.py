@@ -9,7 +9,7 @@ import os
 import torch
 import torch.nn as nn
 
-# Modelo CNN con 1 sola salida (steering)
+# Modelo CNN con 2 salidas (velocidad y direccion)
 class RacerCNN(nn.Module):
     def __init__(self):
         super(RacerCNN, self).__init__()
@@ -31,7 +31,7 @@ class RacerCNN(nn.Module):
             nn.ReLU(),
             nn.Linear(100, 50),
             nn.ReLU(),
-            nn.Linear(50, 1)
+            nn.Linear(50, 2)
         )
 
     def forward(self, x):
@@ -45,10 +45,6 @@ class NeuralPilotNode(Node):
 
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         self.bridge = CvBridge()
-
-        # Cargar parametros configurables de velocidad
-        self.declare_parameter('base_speed', 1.2)
-        self.declare_parameter('max_angular_speed', 2.5)
 
         # Cargar modelo entrenado
         model_path = os.path.expanduser('~/training_data/racer_model.pth')
@@ -69,7 +65,7 @@ class NeuralPilotNode(Node):
         self.sub = self.create_subscription(
             Image, '/camera/image_raw', self.image_callback, 10)
 
-        self.get_logger().info("Autopiloto de Red Neuronal (Ackermann) iniciado.")
+        self.get_logger().info("Autopiloto de Red Neuronal Multivariable (Velocidad y Direccion) iniciado.")
 
     def image_callback(self, msg):
         try:
@@ -86,28 +82,17 @@ class NeuralPilotNode(Node):
                 prediction = self.model(img_tensor)
                 outputs = prediction.cpu().numpy()[0]
 
-            # El modelo predice unicamente la direccion (angular_z)
-            angular_z = float(outputs[0])
+            # El modelo predice velocidad (outputs[0]) y direccion (outputs[1])
+            predicted_linear_x = float(outputs[0])
+            predicted_angular_z = float(outputs[1])
 
-            # Cargar parametros
-            base_speed = self.get_parameter('base_speed').value
-            max_ang = self.get_parameter('max_angular_speed').value
-
-            # Limitar el giro predicho por la red neuronal
-            angular_z = float(np.clip(angular_z, -max_ang, max_ang))
-
-            # --- CONTROL VELOCIDAD INTELIGENTE (F1) ---
-            # Reducir velocidad lineal proporcionalmente segun la fuerza del giro
-            turn_ratio = abs(angular_z) / max_ang
-            linear_x = base_speed * max(0.2, 1.0 - 0.7 * turn_ratio)
-
-            # Publicar velocidades
+            # Publicar velocidades (con clips de seguridad para evitar descontrol)
             twist = Twist()
-            twist.linear.x = float(linear_x)
-            twist.angular.z = float(angular_z)
+            twist.linear.x = float(np.clip(predicted_linear_x, -0.4, 2.0))
+            twist.angular.z = float(np.clip(predicted_angular_z, -3.0, 3.0))
             self.cmd_pub.publish(twist)
 
-            print(f"IA Piloto -> Lin: {twist.linear.x:.2f} m/s | Ang (Giro): {twist.angular.z:+.2f} rad/s", flush=True)
+            print(f"IA Prediccion -> Velocidad: {twist.linear.x:+.2f} m/s | Giro: {twist.angular.z:+.2f} rad/s", flush=True)
 
         except Exception as e:
             self.get_logger().error(f"Error en piloto de IA: {e}")

@@ -8,7 +8,7 @@ import cv2
 import os
 import sys
 
-# Modelo CNN enfocado 100% en predecir la direccion (steering angle)
+# Modelo CNN multivariable: predice velocidad y direccion
 class RacerCNN(nn.Module):
     def __init__(self):
         super(RacerCNN, self).__init__()
@@ -31,7 +31,7 @@ class RacerCNN(nn.Module):
             nn.ReLU(),
             nn.Linear(100, 50),
             nn.ReLU(),
-            nn.Linear(50, 1) # Unica salida: angular_z (direccion)
+            nn.Linear(50, 2) # Dos salidas: [linear_x (velocidad), angular_z (giro)]
         )
 
     def forward(self, x):
@@ -54,8 +54,11 @@ class RacerDataset(Dataset):
         image = image.astype(np.float32) / 255.0
         image = np.transpose(image, (2, 0, 1)) # HWC -> CHW
 
+        linear_x = float(self.data_df.iloc[idx, 1])
         angular_z = float(self.data_df.iloc[idx, 2])
-        return torch.tensor(image), torch.tensor([angular_z], dtype=torch.float32)
+        targets = np.array([linear_x, angular_z], dtype=np.float32)
+
+        return torch.tensor(image), torch.tensor(targets, dtype=torch.float32)
 
 def train():
     data_dir = os.path.expanduser('~/training_data')
@@ -69,16 +72,20 @@ def train():
     print("Cargando dataset...")
     df = pd.read_csv(csv_path)
 
-    # --- BALANCEO DINAMICO DE DATOS ---
-    # Separamos rectas (giro cercano a 0) de las curvas
-    rectas = df[df['angular_z'].abs() < 0.05]
+    # --- BALANCEO INTELIGENTE MULTIVARIABLE ---
+    rectas = df[(df['angular_z'].abs() < 0.05) & (df['linear_x'] > 0.0)]
     curvas = df[df['angular_z'].abs() >= 0.05]
+    reversa = df[df['linear_x'] < -0.01]  # Guardar TODAS las maniobras de marcha atras
+    detenido = df[(df['linear_x'].abs() < 0.01) & (df['angular_z'].abs() < 0.01)]
 
-    # Reducimos las rectas al 15% de forma aleatoria para evitar el sesgo de "ir siempre recto"
+    # Reducimos las rectas al 15% y los frames quietos al 10% para balancear
     rectas_filtradas = rectas.sample(frac=0.15, random_state=42) if len(rectas) > 0 else rectas
-    df_balanceado = pd.concat([rectas_filtradas, curvas]).sample(frac=1.0, random_state=42).reset_index(drop=True)
+    detenidos_filtrados = detenido.sample(frac=0.10, random_state=42) if len(detenido) > 0 else detenido
 
-    print(f"Dataset original: {len(df)} frames | Dataset balanceado: {len(df_balanceado)} frames")
+    df_balanceado = pd.concat([rectas_filtradas, detenidos_filtrados, curvas, reversa]).sample(frac=1.0, random_state=42).reset_index(drop=True)
+
+    print(f"Dataset original: {len(df)} frames")
+    print(f"Dataset balanceado -> Total: {len(df_balanceado)} frames (Curvas: {len(curvas)} | Reversas: {len(reversa)})")
     
     dataset = RacerDataset(dataframe=df_balanceado, root_dir=data_dir)
     
@@ -95,10 +102,10 @@ def train():
 
     model = RacerCNN().to(device)
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=0.0005) # Aprendizaje mas fino para 2 salidas
 
-    # Subimos a 40 epocas para mejor aprendizaje
-    epochs = 40
+    # 80 epocas para asimilar la marcha atras
+    epochs = 80
     print("Iniciando entrenamiento en la GPU...")
 
     for epoch in range(epochs):
@@ -126,7 +133,8 @@ def train():
         train_loss /= len(train_dataset)
         val_loss /= len(val_dataset)
 
-        print(f"Epoch {epoch+1:02d}/{epochs:02d} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f}")
+        if (epoch+1) % 5 == 0 or epoch == 0:
+            print(f"Epoch {epoch+1:02d}/{epochs:02d} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f}")
 
     # Guardar modelo
     model_path = os.path.join(data_dir, 'racer_model.pth')
