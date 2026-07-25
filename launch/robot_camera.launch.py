@@ -14,10 +14,14 @@ def generate_launch_description():
     # urdf/ and worlds/ as siblings — same layout as the source tree.
     launch_dir = os.path.dirname(os.path.abspath(__file__))
     pkg_share = os.path.dirname(launch_dir)
-    urdf_file = os.path.join(pkg_share, 'urdf', 'my_robot.urdf')
+    urdf_file = os.path.join(pkg_share, 'urdf', 'racer_robot.urdf')
 
     with open(urdf_file, 'r') as f:
         robot_description = f.read()
+
+    # Reemplazar rutas de package:// en el URDF por rutas absolutas locales
+    meshes_dir = os.path.join(pkg_share, 'meshes')
+    robot_description = robot_description.replace('package://racer_description/meshes/', meshes_dir + '/')
 
     # Patch world SDF files to use absolute mesh paths at runtime.
     # Gazebo launched via ros2 launch does not resolve relative paths
