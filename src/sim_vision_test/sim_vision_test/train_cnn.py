@@ -8,7 +8,7 @@ import cv2
 import os
 import sys
 
-# Modelo CNN Simple para Autopiloto (inspirado en NVIDIA End-to-End)
+# Modelo CNN enfocado 100% en predecir la direccion (steering angle)
 class RacerCNN(nn.Module):
     def __init__(self):
         super(RacerCNN, self).__init__()
@@ -31,7 +31,7 @@ class RacerCNN(nn.Module):
             nn.ReLU(),
             nn.Linear(100, 50),
             nn.ReLU(),
-            nn.Linear(50, 2) # Salidas: [linear_x, angular_z]
+            nn.Linear(50, 1) # Unica salida: angular_z (direccion)
         )
 
     def forward(self, x):
@@ -40,8 +40,8 @@ class RacerCNN(nn.Module):
         return x
 
 class RacerDataset(Dataset):
-    def __init__(self, csv_file, root_dir):
-        self.data_df = pd.read_csv(csv_file)
+    def __init__(self, dataframe, root_dir):
+        self.data_df = dataframe
         self.root_dir = root_dir
 
     def __len__(self):
@@ -50,15 +50,12 @@ class RacerDataset(Dataset):
     def __getitem__(self, idx):
         img_name = os.path.join(self.root_dir, self.data_df.iloc[idx, 0])
         image = cv2.imread(img_name)
-        # Normalizar imagen a float32 y cambiar dimensiones a PyTorch CHW
+        # Normalizar imagen
         image = image.astype(np.float32) / 255.0
         image = np.transpose(image, (2, 0, 1)) # HWC -> CHW
 
-        linear_x = float(self.data_df.iloc[idx, 1])
         angular_z = float(self.data_df.iloc[idx, 2])
-        targets = np.array([linear_x, angular_z], dtype=np.float32)
-
-        return torch.tensor(image), torch.tensor(targets)
+        return torch.tensor(image), torch.tensor([angular_z], dtype=torch.float32)
 
 def train():
     data_dir = os.path.expanduser('~/training_data')
@@ -70,9 +67,22 @@ def train():
         sys.exit(1)
 
     print("Cargando dataset...")
-    dataset = RacerDataset(csv_file=csv_path, root_dir=data_dir)
+    df = pd.read_csv(csv_path)
+
+    # --- BALANCEO DINAMICO DE DATOS ---
+    # Separamos rectas (giro cercano a 0) de las curvas
+    rectas = df[df['angular_z'].abs() < 0.05]
+    curvas = df[df['angular_z'].abs() >= 0.05]
+
+    # Reducimos las rectas al 15% de forma aleatoria para evitar el sesgo de "ir siempre recto"
+    rectas_filtradas = rectas.sample(frac=0.15, random_state=42) if len(rectas) > 0 else rectas
+    df_balanceado = pd.concat([rectas_filtradas, curvas]).sample(frac=1.0, random_state=42).reset_index(drop=True)
+
+    print(f"Dataset original: {len(df)} frames | Dataset balanceado: {len(df_balanceado)} frames")
     
-    # Division en entrenamiento (80%) y validacion (20%)
+    dataset = RacerDataset(dataframe=df_balanceado, root_dir=data_dir)
+    
+    # Division Entrenamiento (80%) / Validacion (20%)
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
     train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
@@ -80,7 +90,6 @@ def train():
     train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=2)
     val_loader = DataLoader(val_dataset, batch_size=64, shuffle=False, num_workers=2)
 
-    # Configurar dispositivo (GPU CUDA si esta disponible en AWS)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Usando hardware: {device}")
 
@@ -88,7 +97,8 @@ def train():
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-    epochs = 15
+    # Subimos a 40 epocas para mejor aprendizaje
+    epochs = 40
     print("Iniciando entrenamiento en la GPU...")
 
     for epoch in range(epochs):
@@ -118,7 +128,7 @@ def train():
 
         print(f"Epoch {epoch+1:02d}/{epochs:02d} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f}")
 
-    # Guardar modelo entrenado
+    # Guardar modelo
     model_path = os.path.join(data_dir, 'racer_model.pth')
     torch.save(model.state_dict(), model_path)
     print(f"Entrenamiento completado. Modelo guardado en {model_path}")

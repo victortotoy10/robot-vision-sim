@@ -9,7 +9,7 @@ import os
 import torch
 import torch.nn as nn
 
-# Estructura del modelo exactamente igual que en train_cnn.py
+# Modelo CNN con 1 sola salida (steering)
 class RacerCNN(nn.Module):
     def __init__(self):
         super(RacerCNN, self).__init__()
@@ -31,7 +31,7 @@ class RacerCNN(nn.Module):
             nn.ReLU(),
             nn.Linear(100, 50),
             nn.ReLU(),
-            nn.Linear(50, 2)
+            nn.Linear(50, 1)
         )
 
     def forward(self, x):
@@ -46,7 +46,11 @@ class NeuralPilotNode(Node):
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         self.bridge = CvBridge()
 
-        # Cargar modelo entrenado desde la carpeta ~/training_data
+        # Cargar parametros configurables de velocidad
+        self.declare_parameter('base_speed', 1.2)
+        self.declare_parameter('max_angular_speed', 2.5)
+
+        # Cargar modelo entrenado
         model_path = os.path.expanduser('~/training_data/racer_model.pth')
         
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -57,7 +61,6 @@ class NeuralPilotNode(Node):
             self.get_logger().error("Primero debes grabar datos y entrenar el modelo con train_cnn.py")
             raise FileNotFoundError("Modelo racer_model.pth no encontrado.")
 
-        # Inicializar y cargar pesos
         self.model = RacerCNN()
         self.model.load_state_dict(torch.load(model_path, map_location=self.device))
         self.model.to(self.device)
@@ -66,36 +69,45 @@ class NeuralPilotNode(Node):
         self.sub = self.create_subscription(
             Image, '/camera/image_raw', self.image_callback, 10)
 
-        self.get_logger().info("Autopiloto de Red Neuronal iniciado. Conduciendo de forma autonoma...")
+        self.get_logger().info("Autopiloto de Red Neuronal (Ackermann) iniciado.")
 
     def image_callback(self, msg):
         try:
-            # Convertir imagen a OpenCV y redimensionar a 160x120
             frame = self.bridge.imgmsg_to_cv2(msg, 'bgr8')
             frame_resized = cv2.resize(frame, (160, 120))
 
             # Transformar imagen para PyTorch
             img_tensor = frame_resized.astype(np.float32) / 255.0
-            img_tensor = np.transpose(img_tensor, (2, 0, 1)) # HWC -> CHW
-            img_tensor = torch.tensor(img_tensor).unsqueeze(0).to(self.device) # Agregar batch size
+            img_tensor = np.transpose(img_tensor, (2, 0, 1))
+            img_tensor = torch.tensor(img_tensor).unsqueeze(0).to(self.device)
 
             # Inferencia en la GPU
             with torch.no_grad():
                 prediction = self.model(img_tensor)
                 outputs = prediction.cpu().numpy()[0]
 
-            linear_x = float(outputs[0])
-            angular_z = float(outputs[1])
+            # El modelo predice unicamente la direccion (angular_z)
+            angular_z = float(outputs[0])
+
+            # Cargar parametros
+            base_speed = self.get_parameter('base_speed').value
+            max_ang = self.get_parameter('max_angular_speed').value
+
+            # Limitar el giro predicho por la red neuronal
+            angular_z = float(np.clip(angular_z, -max_ang, max_ang))
+
+            # --- CONTROL VELOCIDAD INTELIGENTE (F1) ---
+            # Reducir velocidad lineal proporcionalmente segun la fuerza del giro
+            turn_ratio = abs(angular_z) / max_ang
+            linear_x = base_speed * max(0.2, 1.0 - 0.7 * turn_ratio)
 
             # Publicar velocidades
             twist = Twist()
-            # Limites de seguridad para velocidades del autopiloto
-            twist.linear.x = float(np.clip(linear_x, -0.5, 2.0))
-            twist.angular.z = float(np.clip(angular_z, -3.0, 3.0))
+            twist.linear.x = float(linear_x)
+            twist.angular.z = float(angular_z)
             self.cmd_pub.publish(twist)
 
-            # Log de control
-            print(f"IA Prediccion -> Velocidad Lineal: {twist.linear.x:.2f} m/s | Giro Angular: {twist.angular.z:+.2f} rad/s", flush=True)
+            print(f"IA Piloto -> Lin: {twist.linear.x:.2f} m/s | Ang (Giro): {twist.angular.z:+.2f} rad/s", flush=True)
 
         except Exception as e:
             self.get_logger().error(f"Error en piloto de IA: {e}")
