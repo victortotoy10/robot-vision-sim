@@ -2,7 +2,6 @@ import os
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 
@@ -19,6 +18,28 @@ def generate_launch_description():
 
     with open(urdf_file, 'r') as f:
         robot_description = f.read()
+
+    # Patch world SDF files to use absolute mesh paths at runtime.
+    # Gazebo launched via ros2 launch does not resolve relative paths
+    # like '../meshes/' from the world file's location, causing silent crashes.
+    # We read the SDF, replace '../meshes/' with the absolute path, and
+    # write a patched copy to /tmp for Gazebo to load.
+    import tempfile
+    meshes_dir = os.path.join(pkg_share, 'meshes')
+    worlds_dir = os.path.join(pkg_share, 'worlds')
+
+    def get_patched_world_path(world_name):
+        world_file = os.path.join(worlds_dir, world_name + '.sdf')
+        with open(world_file, 'r') as f:
+            content = f.read()
+        # Replace relative mesh paths with absolute paths
+        content = content.replace('../meshes/', meshes_dir + '/')
+        tmp = tempfile.NamedTemporaryFile(
+            mode='w', suffix='.sdf', delete=False, prefix='gz_world_'
+        )
+        tmp.write(content)
+        tmp.flush()
+        return tmp.name
 
     # Launch argument for headless mode
     headless_arg = DeclareLaunchArgument(
@@ -43,17 +64,28 @@ def generate_launch_description():
         output='screen'
     )
 
-    # Gazebo with our selected world, optionally headless
-    # If headless is 'true', we pass '-s -r <world>', otherwise just '-r <world>'
-    gz_args = PythonExpression([
-        "'-s -r ' + '" + pkg_share + "/worlds/' + '",
-        LaunchConfiguration('world'),
-        "' + '.sdf' if '",
-        LaunchConfiguration('headless'),
-        "' == 'true' else '-r ' + '" + pkg_share + "/worlds/' + '",
-        LaunchConfiguration('world'),
-        "' + '.sdf'"
-    ])
+    # Patch all world files at launch time so absolute mesh paths are used.
+    # We patch them all up front (fast operation) and select at runtime.
+    import sys
+    world_name_arg = None
+    for i, a in enumerate(sys.argv):
+        if a.startswith('world:='):
+            world_name_arg = a.split(':=', 1)[1]
+            break
+    if world_name_arg is None:
+        world_name_arg = 'camera_world'
+
+    headless_val = False
+    for a in sys.argv:
+        if a == 'headless:=true':
+            headless_val = True
+            break
+
+    patched_world = get_patched_world_path(world_name_arg)
+    if headless_val:
+        gz_args_str = f'-s -r {patched_world}'
+    else:
+        gz_args_str = f'-r {patched_world}'
 
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -62,8 +94,9 @@ def generate_launch_description():
                 'launch', 'gz_sim.launch.py'
             )
         ),
-        launch_arguments={'gz_args': gz_args}.items()
+        launch_arguments={'gz_args': gz_args_str}.items()
     )
+
 
     # Spawn the robot from /robot_description
     spawn_robot = Node(

@@ -162,8 +162,9 @@
   <joint name="camera_joint" type="fixed">
     <parent link="base_link"/>
     <child link="camera_link"/>
-    <!-- Mount the camera at the front of the robot, slightly above body -->
-    <origin xyz="0.15 0 0.04" rpy="0 0 0"/>
+    <!-- Posicion basada en referencia ar-tu-do: baja (9.5cm), adelante (21cm) -->
+    <!-- Inclinacion suave de 15 grados hacia abajo para ver el suelo de la pista -->
+    <origin xyz="0.21 0 0.095" rpy="0 0.26 0"/>
   </joint>
 
   <link name="camera_link">
@@ -280,8 +281,8 @@
       <camera>
         <horizontal_fov>1.3962634</horizontal_fov>
         <image>
-          <width>320</width>
-          <height>240</height>
+          <width>640</width>
+          <height>480</height>
           <format>R8G8B8</format>
         </image>
         <clip>
