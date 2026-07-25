@@ -19,17 +19,17 @@ class VisionSimNode(Node):
         self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         self.bridge = CvBridge()
 
-        # HSV (opcional, si use_hsv=true)
+        # HSV (opcional)
         self.declare_parameter('hsv_lower', [0, 0, 180])
         self.declare_parameter('hsv_upper', [180, 60, 255])
         self.declare_parameter('use_hsv', False)
-        # Umbral de brillo para lineas blancas (grayscale) - mas robusto para pista F1
+        # Umbral de brillo para detectar las lineas blancas
         self.declare_parameter('brightness_threshold', 160)
 
         self.declare_parameter('show_image', False)
         self.declare_parameter('follow_line', False)
 
-        # PID
+        # PID ganancias por defecto
         self.declare_parameter('kp', 0.008)
         self.declare_parameter('ki', 0.0)
         self.declare_parameter('kd', 0.002)
@@ -45,11 +45,11 @@ class VisionSimNode(Node):
         self.last_time = time.time()
         self.fps_rolling = 0.0
 
-        # Estado de perdida de linea
+        # Estado de perdida de linea y recuperacion
         self.frames_no_line = 0
         self.last_known_side = 1  # +1=derecha, -1=izquierda
 
-        self.get_logger().info("VisionSimNode iniciado. Detectando lineas de pista F1...")
+        self.get_logger().info("VisionSimNode iniciado con recuperacion de colisiones...")
 
     def image_callback(self, msg):
         t = time.time()
@@ -63,7 +63,7 @@ class VisionSimNode(Node):
             frame = cv2.resize(frame, (320, 240))
             h, w = frame.shape[:2]
 
-            # ROI: 60% inferior donde estan las lineas de la pista
+            # ROI: 60% inferior donde estan las lineas
             roi = frame[int(0.4 * h):, :]
             rh, rw = roi.shape[:2]
 
@@ -74,12 +74,11 @@ class VisionSimNode(Node):
                 hi = np.array(self.get_parameter('hsv_upper').value, dtype=np.uint8)
                 mask = cv2.inRange(hsv, lo, hi)
             else:
-                # Umbral de brillo - detecta lineas blancas sobre asfalto oscuro
                 gray = cv2.GaussianBlur(cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY), (5, 5), 0)
                 thr = self.get_parameter('brightness_threshold').value
                 _, mask = cv2.threshold(gray, thr, 255, cv2.THRESH_BINARY)
 
-            # Limpieza morfologica
+            # Limpieza
             k = np.ones((3, 3), np.uint8)
             mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, k)
             mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, k)
@@ -111,7 +110,7 @@ class VisionSimNode(Node):
             kd = self.get_parameter('kd').value
             steering = kp * error + ki * self.integral + kd * deriv
 
-            # Comandos de velocidad
+            # Velocidad y maniobra
             follow = self.get_parameter('follow_line').value
             lin, ang = 0.0, 0.0
 
@@ -121,12 +120,25 @@ class VisionSimNode(Node):
                 max_ang = self.get_parameter('max_angular_speed').value
 
                 if not line_detected:
-                    twist.linear.x = 0.05
-                    twist.angular.z = 0.5 * float(self.last_known_side)
-                    if self.frames_no_line > 30:
+                    # FASE DE RECUPERACION DE COLISIONES
+                    if self.frames_no_line <= 10:
+                        # Fase 1: Rotar suavemente en el lugar buscando recuperar
                         twist.linear.x = 0.0
-                        twist.angular.z = 0.6 * float(self.last_known_side)
+                        twist.angular.z = 0.5 * float(self.last_known_side)
+                    elif self.frames_no_line <= 35:
+                        # Fase 2: Asumir choque contra pared. ¡Marcha atras (reversa)!
+                        # Retrocedemos girando hacia el lado opuesto para salir del atasco
+                        twist.linear.x = -0.25
+                        twist.angular.z = -0.6 * float(self.last_known_side)
+                    else:
+                        # Fase 3: Detenerse y rotar buscando la linea de nuevo
+                        twist.linear.x = 0.0
+                        twist.angular.z = 0.7 * float(self.last_known_side)
+                        # Reiniciar bucle si pasa demasiado tiempo perdido
+                        if self.frames_no_line > 80:
+                            self.frames_no_line = 11
                 else:
+                    # Conduccion normal
                     ratio = abs(error) / (rw // 2)
                     twist.linear.x = base * max(0.2, 1.0 - 0.8 * ratio)
                     twist.angular.z = float(np.clip(-steering, -max_ang, max_ang))
@@ -141,7 +153,7 @@ class VisionSimNode(Node):
             else:
                 print(f"FPS:{self.fps_rolling:4.1f} | {st} | cx={cx:3d} err={error:+4d}px | AUTONOMO: INACTIVO", flush=True)
 
-            # Visualizacion
+            # Debug visual
             if self.get_parameter('show_image').value and 'DISPLAY' in os.environ:
                 dbg = roi.copy()
                 overlay = np.zeros_like(roi)
