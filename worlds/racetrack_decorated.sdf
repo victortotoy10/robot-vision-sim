@@ -73,7 +73,7 @@
           <cast_shadows>false</cast_shadows>
           <geometry>
             <mesh>
-              <uri>../meshes/track_decorated.dae</uri>
+              <uri>meshes/track_decorated.dae</uri>
             </mesh>
           </geometry>
         </visual>
@@ -100,7 +100,7 @@
         <collision name="walls-collision">
           <geometry>
             <mesh>
-              <uri>../meshes/walls.dae</uri>
+              <uri>meshes/walls.dae</uri>
             </mesh>
           </geometry>
           <surface>
@@ -119,7 +119,7 @@
         <collision name="decoration-collision">
           <geometry>
             <mesh>
-              <uri>../meshes/decoration_colliders.dae</uri>
+              <uri>meshes/decoration_colliders.dae</uri>
             </mesh>
           </geometry>
           <surface>
