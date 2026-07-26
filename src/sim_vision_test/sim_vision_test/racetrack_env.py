@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Entorno Gymnasium personalizado para ROS 2 + Gazebo Sim (Racetrack).
-Compatible con Stable-Baselines3 (PPO, SAC, DDPG, TD3).
-Fix: Eliminada falsa colisión del sensor LiDAR con la propia cámara/chasis del robot.
-La colisión se determina de forma 100% precisa mediante la geometría del circuito (|dist_to_center| > 0.85m).
+Entorno Gymnasium Avanzado para ROS 2 + Gazebo Sim (Racetrack).
+Corrección Integral de MDP Markoviano, Espacio de Estados 12-dim,
+LiDAR de 32 Rayos (sin puntos ciegos), Rango de Giro Ampliado (+-0.7 rad)
+y Recompensa Basada en Progreso Longitudinal Real (F1TENTH / AWS DeepRacer Pro).
 """
 
 import gymnasium as gym
@@ -42,6 +42,9 @@ class Track:
         relative = next_points - self.points
         self.segment_length = np.linalg.norm(relative, axis=1)
         self.length = np.sum(self.segment_length)
+        self.cumulative_length = np.zeros(self.size + 1)
+        self.cumulative_length[1:] = np.cumsum(self.segment_length)
+        
         self.forward = relative / self.segment_length[:, np.newaxis]
         self.right = np.array([self.forward[:, 1], -self.forward[:, 0]]).transpose()
 
@@ -55,9 +58,10 @@ class Track:
         
         segment = np.argmin(distances)
         if distances[segment] == float("Inf"):
-            return 999.0, 0.0
+            return 999.0, 0.0, 0.0
             
-        return x[segment], math.atan2(self.forward[segment, 1], self.forward[segment, 0])
+        progress = self.cumulative_length[segment] + y[segment]
+        return x[segment], math.atan2(self.forward[segment, 1], self.forward[segment, 0]), progress
 
 def euler_yaw(x, y, z, w):
     siny_cosp = 2 * (w * z + x * y)
@@ -73,16 +77,17 @@ class RacetrackEnv(gym.Env):
         self.random_spawn = random_spawn
         self.max_steps = max_steps
 
-        # Espacio de Accion: [angulo (-0.5 a 0.5 rad), velocidad (0.12 a 0.40 m/s)]
+        # 1. Acciones ampliadas: [angulo (-0.7 a 0.7 rad = +-40.1°), velocidad (0.0 a 0.50 m/s)]
         self.action_space = spaces.Box(
-            low=np.array([-0.50, 0.12], dtype=np.float32),
-            high=np.array([0.50, 0.40], dtype=np.float32),
+            low=np.array([-0.70, 0.00], dtype=np.float32),
+            high=np.array([0.70, 0.50], dtype=np.float32),
             dtype=np.float32
         )
 
-        # Observacion: 8 rayos de LiDAR normalizados [0.0, 1.0]
+        # 2. Observaciones completas Markovianas (12 dimensiones):
+        # 8 rayos LiDAR normalizados + 4 estados cinematicos/temporales
         self.observation_space = spaces.Box(
-            low=0.0, high=1.0, shape=(8,), dtype=np.float32
+            low=-2.0, high=2.0, shape=(12,), dtype=np.float32
         )
 
         # ROS 2 Setup
@@ -103,6 +108,12 @@ class RacetrackEnv(gym.Env):
         self.car_x = 0.0
         self.car_y = -0.25
         self.car_yaw = 0.0
+        self.car_vx = 0.0
+        self.car_wz = 0.0
+        
+        self.last_steer = 0.0
+        self.last_speed = 0.0
+        self.last_progress = 0.0
         self.current_step = 0
 
         self.just_reset = False
@@ -115,13 +126,16 @@ class RacetrackEnv(gym.Env):
 
     def _on_scan(self, msg):
         n = len(msg.ranges)
-        indices = [int(i * (n - 1) / 7) for i in range(8)]
+        # Extraer 8 sectores angulares con min-pooling (sin puntos ciegos)
         obs = []
-        for i in indices:
-            r = msg.ranges[i]
-            if math.isinf(r) or math.isnan(r) or r <= 0.18:
-                r = 10.0
-            obs.append(min(r, 10.0) / 10.0)
+        num_sectors = 8
+        sector_size = n // num_sectors
+        for i in range(num_sectors):
+            sector_ranges = msg.ranges[i*sector_size : (i+1)*sector_size]
+            valid_ranges = [r for r in sector_ranges if not math.isinf(r) and not math.isnan(r) and r > 0.18]
+            min_r = min(valid_ranges) if valid_ranges else 10.0
+            obs.append(min(min_r, 10.0) / 10.0)
+            
         self.latest_scan = np.array(obs, dtype=np.float32)
 
     def _on_odom(self, msg):
@@ -141,6 +155,18 @@ class RacetrackEnv(gym.Env):
             msg.pose.pose.orientation.z,
             msg.pose.pose.orientation.w
         )
+        self.car_vx = msg.twist.twist.linear.x
+        self.car_wz = msg.twist.twist.angular.z
+
+    def _get_obs(self):
+        lidar = self.latest_scan if self.latest_scan is not None else np.ones(8, dtype=np.float32)
+        kinematics = np.array([
+            self.car_vx / 0.50,            # Velocidad lineal normalizada
+            self.car_wz / 2.0,             # Velocidad angular normalizada
+            self.last_steer / 0.70,        # Accion de giro anterior
+            self.last_speed / 0.50         # Accion de velocidad anterior
+        ], dtype=np.float32)
+        return np.concatenate([lidar, kinematics])
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -152,57 +178,77 @@ class RacetrackEnv(gym.Env):
         stop = Twist()
         self.cmd_pub.publish(stop)
 
-        # Actualizar posicion inicial estimada
         self.car_x = 0.0
         self.car_y = -0.25
         self.car_yaw = 0.0
+        self.car_vx = 0.0
+        self.car_wz = 0.0
+        self.last_steer = 0.0
+        self.last_speed = 0.0
+        
+        _, _, self.last_progress = self.track.localize(0.0, -0.25)
 
-        # Resetear solo modelos (model_only: true) para evitar saltos en el reloj de simulación
+        # Reset Oficial Gazebo Sim
         req_reset = 'pause: false reset: { model_only: true }'
-
         try:
             subprocess.run(['ign', 'service', '-s', '/world/racetrack/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '500', '--req', req_reset], capture_output=True, timeout=1.0)
         except Exception:
             pass
 
         time.sleep(0.15)
-
-        obs = self.latest_scan if self.latest_scan is not None else np.ones(8, dtype=np.float32)
-        info = {}
-        return obs, info
+        return self._get_obs(), {}
 
     def step(self, action):
         self.current_step += 1
         steer, speed = float(action[0]), float(action[1])
 
-        # Publicar accion a /cmd_vel
+        # Publicar accion
         twist = Twist()
         twist.linear.x = speed
         twist.angular.z = steer
         self.cmd_pub.publish(twist)
 
-        # Esperar ciclo de control (50 ms)
+        self.last_steer = steer
+        self.last_speed = speed
+
+        # Ciclo de control 50 ms
         time.sleep(0.05)
 
-        # Si estamos dentro de la ventana post-reset, retornar recompensa neutra
+        # Ventana de amortiguacion post-reset
         if time.time() - self.reset_time < 0.4:
-            obs = self.latest_scan if self.latest_scan is not None else np.ones(8, dtype=np.float32)
-            return obs, 0.1, False, False, {}
+            return self._get_obs(), 0.0, False, False, {}
 
-        # Evaluar estado
-        dist_to_center, seg_angle = self.track.localize(self.car_x, self.car_y)
+        # Evaluar estado en el circuito
+        dist_to_center, seg_angle, current_progress = self.track.localize(self.car_x, self.car_y)
         raw_diff = seg_angle - self.car_yaw
         angle_diff = math.atan2(math.sin(raw_diff), math.cos(raw_diff))
+
+        # Calcular avance longitudinal real en metros
+        delta_progress = current_progress - self.last_progress
+        if delta_progress < -self.track.length / 2.0:
+            delta_progress += self.track.length
+        elif delta_progress > self.track.length / 2.0:
+            delta_progress -= self.track.length
+            
+        self.last_progress = current_progress
 
         terminated = False
         truncated = self.current_step >= self.max_steps
 
-        # Recompensa tipo AWS DeepRacer:
-        progress_reward = speed * math.cos(angle_diff)
-        center_penalty = 0.5 * abs(dist_to_center)
-        reward = progress_reward - center_penalty
+        # 3. RECOMPENSA DE PROGRESO LONGITUDINAL (F1TENTH / AWS DeepRacer Pro)
+        # Recompensa por metros avanzados en el eje central
+        progress_reward = 10.0 * delta_progress
+        center_penalty = 0.3 * abs(dist_to_center)
+        step_penalty = -0.005  # Evita que se quede quieto a 0 m/s
 
-        # Deteccion de choque/salida 100% precisa basada en la pista (ancho de carril 0.85m)
+        reward = progress_reward - center_penalty + step_penalty
+
+        # Bonus por completar una vuelta completa
+        if current_progress >= self.track.length - 0.5:
+            reward += 100.0
+            terminated = True
+
+        # Choque o sentido contrario
         if abs(dist_to_center) > 0.85:
             terminated = True
             reward = -10.0
@@ -210,14 +256,14 @@ class RacetrackEnv(gym.Env):
             terminated = True
             reward = -5.0
 
-        obs = self.latest_scan if self.latest_scan is not None else np.ones(8, dtype=np.float32)
         info = {
             "dist_to_center": dist_to_center,
+            "delta_progress": delta_progress,
             "speed": speed,
             "steer": steer
         }
 
-        return obs, reward, terminated, truncated, info
+        return self._get_obs(), reward, terminated, truncated, info
 
     def close(self):
         self.node.destroy_node()
