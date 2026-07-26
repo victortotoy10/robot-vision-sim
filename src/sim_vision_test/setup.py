@@ -17,7 +17,6 @@ setup(
     maintainer_email='akenitoy@todo.todo',
     description='Paquete de procesamiento de vision con OpenCV en simulacion para ROS 2',
     license='Apache-2.0',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'vision_sim_node = sim_vision_test.vision_sim_node:main',
