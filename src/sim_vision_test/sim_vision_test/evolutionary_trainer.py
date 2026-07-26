@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-Entrenador Evolutivo Avanzado con Control de Trayectoria.
-Fixes:
-1. Modulo bug en calculo de diferencia angular (atan2 sin/cos).
-2. Limite de giro respetando URDF Ackermann (max 0.5 rad).
-3. Reset OFICIAL de Gazebo Sim usando /world/racetrack/control (WorldControl: reset all + pause: false).
-4. Corrección de auto-colisión LiDAR: ignora r <= 0.10m (rango minimo del sensor).
+Entrenador Evolutivo Adaptado 1:1 de ar-tu-do-master para ROS 2 + Gazebo Sim.
+
+Arquitectura ar-tu-do-master:
+- Red Neuronal: Linear(8, 8) -> ReLU -> Linear(8, 8) -> ReLU -> Linear(8, 2) -> Tanh
+- 8 muestras de LiDAR.
+- Velocidad: [0.10, 0.40] m/s (conservadora y precisa).
+- Direccion: [-0.5, 0.5] rad.
+- Reset: PAUSE -> SET_POSE (en punto aleatorio de la pista) -> UNPAUSE.
 """
 
 import rclpy
@@ -52,6 +54,17 @@ class Track:
         self.cumulative_distance = np.zeros(len(points))
         self.cumulative_distance[1:] = np.cumsum(self.segment_length)
 
+    def get_random_spawn(self):
+        idx = random.randint(0, self.size - 1)
+        p = self.points[idx]
+        fwd = self.forward[idx]
+        angle = math.atan2(fwd[1], fwd[0])
+        # Agregar pequeño offset aleatorio [-5cm, +5cm]
+        offset = random.uniform(-0.05, 0.05)
+        px = p[0] + self.right[idx, 0] * offset
+        py = p[1] + self.right[idx, 1] * offset
+        return px, py, angle
+
     def localize(self, px, py):
         local = np.array([px, py]) - self.points
         x = local[:, 0] * self.right[:, 0] + local[:, 1] * self.right[:, 1]
@@ -73,33 +86,29 @@ def euler_yaw(x, y, z, w):
     return math.atan2(siny_cosp, cosy_cosp)
 
 
-LIDAR_SAMPLES = 10
-POPULATION_SIZE = 25
-SURVIVOR_COUNT = 5
-INITIAL_POPULATION = 60
+STATE_SIZE = 8
+POPULATION_SIZE = 10
+SURVIVOR_COUNT = 4
 MAX_EPISODE_STEPS = 2000
-MUTATION_RATE = 0.15
+MUTATION_RATE = 0.10
 
-MIN_SPEED = 0.3
-MAX_SPEED = 0.8
-MAX_STEER = 0.5  # Respetando limite del URDF (0.6 rad)
+MIN_SPEED = 0.12
+MAX_SPEED = 0.40
+MAX_STEER = 0.50
 
 MODEL_DIR = os.path.expanduser('~/evolutionary_models')
-
-SPAWN_X = 0.0
-SPAWN_Y = -0.25
-SPAWN_Z = 0.15
+GAZEBO_MODEL_NAME = 'racer_robot'
 
 
 class NeuralDriver(nn.Module):
     def __init__(self):
         super(NeuralDriver, self).__init__()
         self.layers = nn.Sequential(
-            nn.Linear(LIDAR_SAMPLES, 16),
+            nn.Linear(STATE_SIZE, 8),
             nn.ReLU(),
-            nn.Linear(16, 16),
+            nn.Linear(8, 8),
             nn.ReLU(),
-            nn.Linear(16, 2),
+            nn.Linear(8, 2),
             nn.Tanh()
         )
         self.fitness = 0.0
@@ -111,7 +120,7 @@ class NeuralDriver(nn.Module):
             output = self.layers(state)
         angle = output[0].item() * MAX_STEER
         speed_norm = output[1].item()
-        speed = MIN_SPEED + (speed_norm + 1.0) / 2.0 * (MAX_SPEED - MIN_SPEED)
+        speed = (MIN_SPEED + MAX_SPEED) / 2.0 + speed_norm * (MAX_SPEED - MIN_SPEED) / 2.0
         return angle, speed
 
     def to_vector(self):
@@ -156,11 +165,11 @@ class EvolutionaryTrainerNode(Node):
 
         self.scan_indices = None
         self.latest_lidar = None
-        self.car_x = SPAWN_X
-        self.car_y = SPAWN_Y
+        self.car_x = 0.0
+        self.car_y = -0.25
         self.car_yaw = 0.0
-        self.last_x = SPAWN_X
-        self.last_y = SPAWN_Y
+        self.last_x = 0.0
+        self.last_y = -0.25
         self.distance_traveled = 0.0
 
         self.just_reset = False
@@ -172,7 +181,7 @@ class EvolutionaryTrainerNode(Node):
         self.is_crashed = False
         self.crash_reason = ""
 
-        self.untested = [NeuralDriver() for _ in range(INITIAL_POPULATION)]
+        self.untested = [NeuralDriver() for _ in range(POPULATION_SIZE)]
         self.tested = []
         self.current_driver = self.untested[0]
         self.best_fitness_ever = 0.0
@@ -182,14 +191,14 @@ class EvolutionaryTrainerNode(Node):
         self.warmup_count = 0
 
         self.get_logger().info('='*60)
-        self.get_logger().info('   ENTRENADOR EVOLUTIVO AVANZADO (LIDAR FILTER FIX)')
+        self.get_logger().info('   ENTRENADOR EVOLUTIVO (FIEL A AR-TU-DO-MASTER 1:1)')
         self.get_logger().info('='*60)
 
     def on_lidar(self, msg):
         if self.scan_indices is None:
             n = len(msg.ranges)
-            self.scan_indices = [int(i * (n - 1) / (LIDAR_SAMPLES - 1))
-                                 for i in range(LIDAR_SAMPLES)]
+            self.scan_indices = [int(i * (n - 1) / (STATE_SIZE - 1))
+                                 for i in range(STATE_SIZE)]
 
         values = []
         for i in self.scan_indices:
@@ -206,8 +215,7 @@ class EvolutionaryTrainerNode(Node):
         front_start = len(msg.ranges) // 3
         front_end = 2 * len(msg.ranges) // 3
         for r in msg.ranges[front_start:front_end]:
-            # Evitar r <= 0.10m que es el limite minimo interno del propio sensor LiDAR
-            if not math.isinf(r) and not math.isnan(r) and 0.105 < r < 0.22:
+            if not math.isinf(r) and not math.isnan(r) and 0.105 < r < 0.20:
                 self.is_crashed = True
                 self.crash_reason = f"CHOQUE FÍSICO (LiDAR: {r:.2f}m)"
                 break
@@ -222,8 +230,7 @@ class EvolutionaryTrainerNode(Node):
         y = msg.pose.pose.position.y
 
         if self.just_reset:
-            dist_to_spawn = math.sqrt((x - SPAWN_X)**2 + (y - SPAWN_Y)**2)
-            if dist_to_spawn > 0.5 and (time.time() - self.reset_time < 0.5):
+            if time.time() - self.reset_time < 0.5:
                 return
             else:
                 self.just_reset = False
@@ -255,10 +262,10 @@ class EvolutionaryTrainerNode(Node):
             self.end_episode()
             return
 
-        # 3. Control de Orientacion CORREGIDO
+        # 3. Control de Orientacion
         raw_diff = seg_angle - self.car_yaw
         angle_diff = math.atan2(math.sin(raw_diff), math.cos(raw_diff))
-        if abs(angle_diff) > 1.2:  # Desviado mas de ~70 grados
+        if abs(angle_diff) > 1.2:
             self.is_crashed = True
             self.crash_reason = f"SENTIDO INCORRECTO ({abs(angle_diff)*180/math.pi:.0f}°)"
             self.end_episode()
@@ -330,7 +337,7 @@ class EvolutionaryTrainerNode(Node):
             best_path = os.path.join(MODEL_DIR, 'best_driver.pth')
             best.save(best_path)
             self.get_logger().info(
-                f'  ★ NUEVO RECORD DE VERDAD! Fitness: {best.fitness:.1f} → Guardado en best_driver.pth')
+                f'  ★ NUEVO RECORD! Fitness: {best.fitness:.1f} → Guardado en best_driver.pth')
 
         self.get_logger().info('='*60)
 
@@ -370,29 +377,34 @@ class EvolutionaryTrainerNode(Node):
         self.last_y = self.car_y
 
     def reset_car_position(self):
-        self.car_x = SPAWN_X
-        self.car_y = SPAWN_Y
-        self.car_yaw = 0.0
+        # Seleccionar spawn aleatorio a lo largo de la pista (como ar-tu-do-master)
+        px, py, angle = self.track.get_random_spawn()
+        sz = math.sin(angle / 2.0)
+        cz = math.cos(angle / 2.0)
+
+        self.car_x = px
+        self.car_y = py
+        self.car_yaw = angle
         self.just_reset = True
         self.reset_time = time.time()
 
-        # Servicio Oficial WorldControl de Gazebo Sim + Despausa activa (pause: false)
-        req_proto = 'pause: false reset: { all: true }'
+        req_pause = 'pause: true'
+        req_unpause = 'pause: false'
+        req_pose = (
+            f'name: "{GAZEBO_MODEL_NAME}" '
+            f'position {{ x: {px:.4f} y: {py:.4f} z: 0.15 }} '
+            f'orientation {{ x: 0.0 y: 0.0 z: {sz:.4f} w: {cz:.4f} }}'
+        )
 
-        cmds = [
-            ['ign', 'service', '-s', '/world/racetrack/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '1000', '--req', req_proto],
-            ['gz', 'service', '-s', '/world/racetrack/control', '--reqtype', 'gz.msgs.WorldControl', '--reptype', 'gz.msgs.Boolean', '--timeout', '1000', '--req', req_proto],
-            ['ign', 'service', '-s', '/world/camera_world/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '1000', '--req', req_proto],
-            ['gz', 'service', '-s', '/world/camera_world/control', '--reqtype', 'gz.msgs.WorldControl', '--reptype', 'gz.msgs.Boolean', '--timeout', '1000', '--req', req_proto],
-        ]
-
-        for cmd in cmds:
-            try:
-                res = subprocess.run(cmd, capture_output=True, text=True, timeout=1.5)
-                if res.returncode == 0:
-                    break
-            except Exception:
-                continue
+        try:
+            # 1. Pausar física
+            subprocess.run(['ign', 'service', '-s', '/world/racetrack/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '300', '--req', req_pause], capture_output=True, timeout=0.8)
+            # 2. Teletransportar modelo
+            subprocess.run(['ign', 'service', '-s', '/world/racetrack/set_pose', '--reqtype', 'ignition.msgs.Pose', '--reptype', 'ignition.msgs.Boolean', '--timeout', '500', '--req', req_pose], capture_output=True, timeout=1.0)
+            # 3. Despausar física
+            subprocess.run(['ign', 'service', '-s', '/world/racetrack/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '300', '--req', req_unpause], capture_output=True, timeout=0.8)
+        except Exception as e:
+            self.get_logger().warn(f'Error en el ciclo de reset: {e}')
 
 
 def main(args=None):
