@@ -4,7 +4,7 @@ Entrenador Evolutivo Avanzado con Control de Trayectoria.
 Fixes:
 1. Modulo bug en calculo de diferencia angular (atan2 sin/cos).
 2. Limite de giro respetando URDF Ackermann (max 0.5 rad).
-3. Reset OFICIAL de Gazebo Sim usando /world/racetrack/control (WorldControl: reset all).
+3. Reset OFICIAL de Gazebo Sim usando /world/racetrack/control (WorldControl: reset all + pause: false).
 """
 
 import rclpy
@@ -181,7 +181,7 @@ class EvolutionaryTrainerNode(Node):
         self.warmup_count = 0
 
         self.get_logger().info('='*60)
-        self.get_logger().info('   ENTRENADOR EVOLUTIVO AVANZADO (WORLD CONTROL RESET)')
+        self.get_logger().info('   ENTRENADOR EVOLUTIVO AVANZADO (WORLD CONTROL RESET + UNPAUSE)')
         self.get_logger().info('='*60)
 
     def on_lidar(self, msg):
@@ -374,8 +374,8 @@ class EvolutionaryTrainerNode(Node):
         self.just_reset = True
         self.reset_time = time.time()
 
-        # Servicio Oficial WorldControl de Gazebo Sim
-        req_proto = 'reset: { all: true }'
+        # Servicio Oficial WorldControl de Gazebo Sim + Despausa activa (pause: false)
+        req_proto = 'pause: false reset: { all: true }'
 
         cmds = [
             ['ign', 'service', '-s', '/world/racetrack/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '1000', '--req', req_proto],
