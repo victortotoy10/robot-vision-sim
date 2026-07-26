@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Script de entrenamiento de PPO utilizando Stable-Baselines3 y RacetrackEnv.
+Configurado para actualización Ultra-Rápida (n_steps=256, updates cada 12 segundos).
 """
 
 import os
@@ -24,27 +25,27 @@ def main():
     os.makedirs(log_dir, exist_ok=True)
 
     print("=" * 60)
-    print("   INICIANDO ENTRENAMIENTO CON STABLE-BASELINES3 (PPO)")
+    print("   INICIANDO ENTRENAMIENTO PPO (MODO ULTRA-RÁPIDO)")
     print("=" * 60)
 
     # Crear Entorno Gymnasium
-    env = RacetrackEnv(random_spawn=True, max_steps=1500)
+    env = RacetrackEnv(random_spawn=False, max_steps=1500)
 
-    # Callback para guardar checkpoints cada 10,000 pasos
+    # Callback para guardar checkpoints cada 5,000 pasos
     checkpoint_callback = CheckpointCallback(
-        save_freq=10000,
+        save_freq=5000,
         save_path=model_dir,
         name_prefix="ppo_racetrack_model"
     )
 
-    # Configurar Agente PPO en CPU (mucho mas rapido para MLP pequeñas)
+    # Configurar Agente PPO con n_steps=256 para actualizaciones 4 veces mas frecuentes
     model = PPO(
         policy="MlpPolicy",
         env=env,
         learning_rate=3e-4,
-        n_steps=1024,
-        batch_size=64,
-        n_epochs=10,
+        n_steps=256,        # Actualizacion ultra frecuente (cada ~12 segundos)
+        batch_size=32,      # Procesamiento super veloz
+        n_epochs=4,         # Menos épocas de gradiente por iteración
         gamma=0.99,
         gae_lambda=0.95,
         clip_range=0.2,
@@ -55,7 +56,7 @@ def main():
     )
 
     try:
-        print("[INFO] Entrenando modelo por 100,000 pasos de tiempo...")
+        print("[INFO] Entrenando modelo en modo rápido...")
         model.learn(total_timesteps=100000, callback=checkpoint_callback)
         
         final_model_path = os.path.join(model_dir, "ppo_racetrack_final.zip")
