@@ -5,6 +5,7 @@ Fixes:
 1. Modulo bug en calculo de diferencia angular (atan2 sin/cos).
 2. Limite de giro respetando URDF Ackermann (max 0.5 rad).
 3. Reset OFICIAL de Gazebo Sim usando /world/racetrack/control (WorldControl: reset all + pause: false).
+4. Corrección de auto-colisión LiDAR: ignora r <= 0.10m (rango minimo del sensor).
 """
 
 import rclpy
@@ -181,7 +182,7 @@ class EvolutionaryTrainerNode(Node):
         self.warmup_count = 0
 
         self.get_logger().info('='*60)
-        self.get_logger().info('   ENTRENADOR EVOLUTIVO AVANZADO (WORLD CONTROL RESET + UNPAUSE)')
+        self.get_logger().info('   ENTRENADOR EVOLUTIVO AVANZADO (LIDAR FILTER FIX)')
         self.get_logger().info('='*60)
 
     def on_lidar(self, msg):
@@ -193,7 +194,7 @@ class EvolutionaryTrainerNode(Node):
         values = []
         for i in self.scan_indices:
             v = msg.ranges[i]
-            if math.isinf(v) or math.isnan(v):
+            if math.isinf(v) or math.isnan(v) or v <= 0.10:
                 v = 10.0
             values.append(min(v, 10.0))
 
@@ -205,9 +206,10 @@ class EvolutionaryTrainerNode(Node):
         front_start = len(msg.ranges) // 3
         front_end = 2 * len(msg.ranges) // 3
         for r in msg.ranges[front_start:front_end]:
-            if not math.isinf(r) and not math.isnan(r) and r < 0.12:
+            # Evitar r <= 0.10m que es el limite minimo interno del propio sensor LiDAR
+            if not math.isinf(r) and not math.isnan(r) and 0.105 < r < 0.22:
                 self.is_crashed = True
-                self.crash_reason = "CHOQUE FÍSICO (LiDAR)"
+                self.crash_reason = f"CHOQUE FÍSICO (LiDAR: {r:.2f}m)"
                 break
 
         if not self.warmup_done:
