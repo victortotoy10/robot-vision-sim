@@ -24,6 +24,7 @@ setup(
             'neural_pilot_node = sim_vision_test.neural_pilot_node:main',
             'evolutionary_trainer = sim_vision_test.evolutionary_trainer:main',
             'evolutionary_pilot = sim_vision_test.evolutionary_pilot:main',
+            'artudo_wall_follower = sim_vision_test.artudo_wall_follower_node:main',
             'train_sb3 = sim_vision_test.train_sb3:main',
             'sb3_pilot = sim_vision_test.sb3_pilot:main'
         ],
