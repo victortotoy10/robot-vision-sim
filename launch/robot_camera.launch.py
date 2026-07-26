@@ -1,4 +1,6 @@
 import os
+import sys
+import glob
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -8,10 +10,24 @@ from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
 
+    # Configurar variables de entorno para aceleración EGL / NVIDIA GPU en Ignition Gazebo
+    os.environ['__NV_PRIME_RENDER_OFFLOAD'] = '1'
+    os.environ['__GLX_VENDOR_LIBRARY_NAME'] = 'nvidia'
+    
+    egl_json = '/usr/share/glvnd/egl_vendor.d/10_nvidia.json'
+    if os.path.exists(egl_json):
+        os.environ['__EGL_VENDOR_LIBRARY_FILENAMES'] = egl_json
+
+    # Detección automática de OGRE2_RESOURCE_PATH
+    ogre2_path = '/usr/lib/x86_64-linux-gnu/OGRE-2.3.0'
+    if not os.path.exists(ogre2_path):
+        matches = glob.glob('/usr/lib/**/OGRE-2.*', recursive=True)
+        if matches:
+            ogre2_path = matches[0]
+    if os.path.exists(ogre2_path):
+        os.environ['OGRE2_RESOURCE_PATH'] = ogre2_path
+
     # Resolve URDF / world relative to this launch file's location.
-    # Works both when running from the source tree (no colcon needed) and
-    # after `colcon build` because the installed share/<pkg>/launch/ has
-    # urdf/ and worlds/ as siblings — same layout as the source tree.
     launch_dir = os.path.dirname(os.path.abspath(__file__))
     pkg_share = os.path.dirname(launch_dir)
     urdf_file = os.path.join(pkg_share, 'urdf', 'racer_robot.urdf')
@@ -24,19 +40,13 @@ def generate_launch_description():
     robot_description = robot_description.replace('package://racer_description/meshes/', meshes_dir + '/')
 
     # Patch world SDF files to use absolute mesh paths at runtime.
-    # Gazebo launched via ros2 launch does not resolve relative paths
-    # like '../meshes/' from the world file's location, causing silent crashes.
-    # We read the SDF, replace '../meshes/' with the absolute path, and
-    # write a patched copy to /tmp for Gazebo to load.
     import tempfile
-    meshes_dir = os.path.join(pkg_share, 'meshes')
     worlds_dir = os.path.join(pkg_share, 'worlds')
 
     def get_patched_world_path(world_name):
         world_file = os.path.join(worlds_dir, world_name + '.sdf')
         with open(world_file, 'r') as f:
             content = f.read()
-        # Replace relative mesh paths with absolute paths
         content = content.replace('../meshes/', meshes_dir + '/')
         tmp = tempfile.NamedTemporaryFile(
             mode='w', suffix='.sdf', delete=False, prefix='gz_world_'
@@ -68,9 +78,6 @@ def generate_launch_description():
         output='screen'
     )
 
-    # Patch all world files at launch time so absolute mesh paths are used.
-    # We patch them all up front (fast operation) and select at runtime.
-    import sys
     world_name_arg = None
     for i, a in enumerate(sys.argv):
         if a.startswith('world:='):
@@ -101,7 +108,6 @@ def generate_launch_description():
         launch_arguments={'gz_args': gz_args_str}.items()
     )
 
-
     # Spawn the robot from /robot_description
     spawn_robot = Node(
         package='ros_gz_sim',
@@ -115,7 +121,6 @@ def generate_launch_description():
     )
 
     # Bridge: Gazebo <-> ROS2
-    # Maps cmd_vel, odom, joint_states, scan, camera/image_raw, camera_info, clock, and TF.
     bridge = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
