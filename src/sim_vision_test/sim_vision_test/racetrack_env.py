@@ -243,10 +243,9 @@ class RacetrackEnv(gym.Env):
 
         reward = progress_reward - center_penalty + step_penalty
 
-        # Bonus por completar una vuelta completa
+        # Bonus por completar una vuelta completa (no termina el episodio para permitir vueltas continuas)
         if current_progress >= self.track.length - 0.5:
-            reward += 100.0
-            terminated = True
+            reward += 50.0
 
         # Choque o sentido contrario
         if abs(dist_to_center) > 0.85:
@@ -255,6 +254,12 @@ class RacetrackEnv(gym.Env):
         elif abs(angle_diff) > 1.2:
             terminated = True
             reward = -5.0
+
+        if self.current_step % 50 == 0:
+            obs_check = self._get_obs()
+            print(f"[OBS DEBUG] LiDAR min/max: {obs_check[:8].min():.2f}/{obs_check[:8].max():.2f} | "
+                  f"v_norm: {obs_check[8]:.2f} | w_norm: {obs_check[9]:.2f} | "
+                  f"steer_prev: {obs_check[10]:.2f} | speed_prev: {obs_check[11]:.2f}")
 
         info = {
             "dist_to_center": dist_to_center,

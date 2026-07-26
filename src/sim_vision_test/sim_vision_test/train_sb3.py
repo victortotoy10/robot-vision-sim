@@ -77,8 +77,8 @@ def main():
     )
 
     try:
-        print(f"[INFO] Entrenando modelo en GPU ({device_name}) por 100,000 pasos...")
-        model.learn(total_timesteps=100000, callback=checkpoint_callback)
+        print(f"[INFO] Entrenando modelo en GPU ({device_name}) por 50,000 pasos de prueba...")
+        model.learn(total_timesteps=50000, callback=checkpoint_callback)
         
         final_model_path = os.path.join(model_dir, "ppo_racetrack_final_gpu.zip")
         model.save(final_model_path)
