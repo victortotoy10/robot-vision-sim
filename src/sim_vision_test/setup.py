@@ -24,7 +24,9 @@ setup(
             'data_recorder_node = sim_vision_test.data_recorder:main',
             'neural_pilot_node = sim_vision_test.neural_pilot_node:main',
             'evolutionary_trainer = sim_vision_test.evolutionary_trainer:main',
-            'evolutionary_pilot = sim_vision_test.evolutionary_pilot:main'
+            'evolutionary_pilot = sim_vision_test.evolutionary_pilot:main',
+            'train_sb3 = sim_vision_test.train_sb3:main',
+            'sb3_pilot = sim_vision_test.sb3_pilot:main'
         ],
     },
 )
