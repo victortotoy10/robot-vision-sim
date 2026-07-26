@@ -8,11 +8,21 @@
 
 ## 1. Resumen Ejecutivo y Estado Actual
 
-El proyecto ha evolucionado hacia un **sistema híbrido de conducción autónoma de 3 pilares** que combina la robótica determinista clásica con el aprendizaje profundo por IA:
+Actualmente el proyecto cuenta con varios algoritmos disponibles en el repositorio. Para evitar confusiones, el sistema se divide en **Flujo Activo** (lo que estamos ejecutando en este momento) y **Algoritmos en Segundo Plano** (guardados y disponibles, pero inactivos):
 
-1. **Piloto Autónomo Determinista (`artudo_wall_follower`):** Adaptación 1:1 en ROS 2 del algoritmo de seguimiento de paredes (*Wall-Following*) de `ar-tu-do-master`. Utiliza lecturas del LiDAR 2D y un **Controlador PID con Proyección Futura** para navegar de forma impecable y continua por la pista de carreras decorada en 3D (`racetrack_decorated.sdf`) sin necesidad de entrenamiento.
-2. **Grabador Automático de Telemetría (`artudo_data_recorder`):** Captura en tiempo real (a 20 Hz / 50ms) la telemetría del piloto de `ar-tu-do-master` durante 20 o más vueltas continuas, generando un **dataset experto limpio y sin choques** (`artudo_expert_dataset.npz`) para entrenar redes neuronales por Aprendizaje Supervisado (Clonación de Comportamiento).
-3. **Entorno de Aprendizaje por Refuerzo (PPO - Stable-Baselines3):** Entorno Gymnasium (`racetrack_env.py`) equipado con **5 correcciones críticas de estabilidad** (detección de atascos, penalización por proximidad, features de peligro y *Frame Stacking* de 4 cuadros) para entrenar políticas óptimas aceleradas por GPU en CUDA Tesla T4.
+### 🟢 Flujo Activo (Lo que estamos usando AHORA MISMO):
+1. **Piloto Autónomo Determinista (`artudo_wall_follower`):** Adaptación 1:1 en ROS 2 del algoritmo de seguimiento de paredes (*Wall-Following*) de `ar-tu-do-master`. Navega de forma impecable y continua por la pista decorada 3D (`racetrack_decorated.sdf`) usando LiDAR y PID sin requerir entrenamiento.
+2. **Grabador Automático de Telemetría (`artudo_data_recorder`):** Intercepta la conducción perfecta del piloto autónomo durante 20 o más vueltas continuas para generar un **dataset experto limpio** (`artudo_expert_dataset.npz`).
+
+---
+
+### ⚪ Algoritmos en Segundo Plano (Disponibles en el Repo, NO activos actualmente):
+
+| Algoritmo | Estado Actual | ¿Por qué NO se está usando ahora? |
+| :--- | :--- | :--- |
+| **PPO Deep RL (`train_sb3`)** | Inactivo / Disponible | Entrena por prueba y error (puede chocar miles de veces antes de aprender). Se dejó en segundo plano para usar el piloto perfecto de `ar-tu-do-master`. |
+| **Algoritmo Evolutivo (`evolutionary_trainer`)** | Inactivo / Disponible | Evoluciona 25 cerebros por mutación y supervivencia del más fuerte. Funciona, pero toma tiempo iterar generaciones. |
+| **Segmentador de Visión OpenCV (`vision_sim_node`)** | Inactivo / Disponible | Procesa la línea blanca por filtro HSV de cámara. No se usa ahora porque el LiDAR y las paredes 3D ya le dan navegación perfecta al auto. |
 
 ---
 
