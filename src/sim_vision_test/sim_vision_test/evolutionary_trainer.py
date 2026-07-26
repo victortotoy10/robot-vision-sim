@@ -4,6 +4,7 @@ Entrenador Evolutivo Avanzado con Control de Trayectoria.
 Fixes:
 1. Modulo bug en calculo de diferencia angular (atan2 sin/cos).
 2. Limite de giro respetando URDF Ackermann (max 0.5 rad).
+3. Reset ultra-robusto probando variantes de ign y gz service para prevenir bloqueos de posicion.
 """
 
 import rclpy
@@ -84,7 +85,6 @@ MAX_STEER = 0.5  # Respetando limite del URDF (0.6 rad)
 
 MODEL_DIR = os.path.expanduser('~/evolutionary_models')
 GAZEBO_MODEL_NAME = 'my_robot'
-GAZEBO_WORLD_NAME = 'racetrack'
 
 SPAWN_X = 0.0
 SPAWN_Y = -0.25
@@ -182,7 +182,7 @@ class EvolutionaryTrainerNode(Node):
         self.warmup_count = 0
 
         self.get_logger().info('='*60)
-        self.get_logger().info('   ENTRENADOR EVOLUTIVO AVANZADO CORREGIDO')
+        self.get_logger().info('   ENTRENADOR EVOLUTIVO AVANZADO MULTI-SERVICE')
         self.get_logger().info('='*60)
 
     def on_lidar(self, msg):
@@ -254,7 +254,7 @@ class EvolutionaryTrainerNode(Node):
             self.end_episode()
             return
 
-        # 3. Control de Orientacion CORREGIDO (atan2 sin/cos)
+        # 3. Control de Orientacion CORREGIDO
         raw_diff = seg_angle - self.car_yaw
         angle_diff = math.atan2(math.sin(raw_diff), math.cos(raw_diff))
         if abs(angle_diff) > 1.2:  # Desviado mas de ~70 grados
@@ -375,30 +375,49 @@ class EvolutionaryTrainerNode(Node):
         sz = math.sin(yaw / 2.0)
         cz = math.cos(yaw / 2.0)
 
-        self.car_x = SPAWN_X + offset_x
-        self.car_y = SPAWN_Y + offset_y
+        px = SPAWN_X + offset_x
+        py = SPAWN_Y + offset_y
+        pz = SPAWN_Z
+
+        self.car_x = px
+        self.car_y = py
         self.car_yaw = yaw
         self.just_reset = True
         self.reset_time = time.time()
 
-        req = (
+        # Variantes de sintaxis de comandos de servicio de Gazebo
+        req_proto = (
             f'name: "{GAZEBO_MODEL_NAME}" '
-            f'position: {{x: {self.car_x}, y: {self.car_y}, z: {SPAWN_Z}}} '
-            f'orientation: {{x: 0, y: 0, z: {sz:.4f}, w: {cz:.4f}}}'
+            f'position {{ x: {px:.4f} y: {py:.4f} z: {pz:.4f} }} '
+            f'orientation {{ x: 0.0 y: 0.0 z: {sz:.4f} w: {cz:.4f} }}'
+        )
+        req_json = (
+            f'name: "{GAZEBO_MODEL_NAME}" '
+            f'position: {{x: {px:.4f}, y: {py:.4f}, z: {pz:.4f}}} '
+            f'orientation: {{x: 0.0, y: 0.0, z: {sz:.4f}, w: {cz:.4f}}}'
         )
 
-        try:
-            subprocess.run(
-                ['ign', 'service',
-                 '-s', f'/world/{GAZEBO_WORLD_NAME}/set_pose',
-                 '--reqtype', 'ignition.msgs.Pose',
-                 '--reptype', 'ignition.msgs.Boolean',
-                 '--timeout', '1000',
-                 '--req', req],
-                capture_output=True, timeout=3
-            )
-        except Exception as e:
-            self.get_logger().warn(f'Error reset: {e}')
+        cmds = [
+            ['ign', 'service', '-s', '/world/racetrack/set_pose', '--reqtype', 'ignition.msgs.Pose', '--reptype', 'ignition.msgs.Boolean', '--timeout', '500', '--req', req_proto],
+            ['ign', 'service', '-s', '/world/racetrack/set_pose', '--reqtype', 'ignition.msgs.Pose', '--reptype', 'ignition.msgs.Boolean', '--timeout', '500', '--req', req_json],
+            ['gz', 'service', '-s', '/world/racetrack/set_pose', '--reqtype', 'gz.msgs.Pose', '--reptype', 'gz.msgs.Boolean', '--timeout', '500', '--req', req_proto],
+            ['gz', 'service', '-s', '/world/racetrack/set_pose', '--reqtype', 'gz.msgs.Pose', '--reptype', 'gz.msgs.Boolean', '--timeout', '500', '--req', req_json],
+            ['ign', 'service', '-s', '/world/camera_world/set_pose', '--reqtype', 'ignition.msgs.Pose', '--reptype', 'ignition.msgs.Boolean', '--timeout', '500', '--req', req_proto],
+            ['gz', 'service', '-s', '/world/camera_world/set_pose', '--reqtype', 'gz.msgs.Pose', '--reptype', 'gz.msgs.Boolean', '--timeout', '500', '--req', req_proto],
+        ]
+
+        success = False
+        for cmd in cmds:
+            try:
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=1.5)
+                if res.returncode == 0 and ('true' in res.stdout.lower() or 'success' in res.stdout.lower() or res.stdout.strip() == ''):
+                    success = True
+                    break
+            except Exception:
+                continue
+
+        if not success:
+            self.get_logger().warn('No se pudo resetear la posición en Gazebo. Revisa la simulación.')
 
 
 def main(args=None):
