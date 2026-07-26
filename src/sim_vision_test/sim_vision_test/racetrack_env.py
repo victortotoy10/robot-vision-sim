@@ -2,6 +2,10 @@
 """
 Entorno Gymnasium personalizado para ROS 2 + Gazebo Sim (Racetrack).
 Compatible con Stable-Baselines3 (PPO, SAC, DDPG, TD3).
+Fixes:
+1. Sincronizacion inmediata de posicion al hacer reset.
+2. Ignorar lecturas viejas de odom/scan durante los primeros 0.5s tras el reset.
+3. Eliminacion de bucle instantaneo de choques (ep_len_mean fixed).
 """
 
 import gymnasium as gym
@@ -74,9 +78,6 @@ def euler_yaw(x, y, z, w):
 
 
 class RacetrackEnv(gym.Env):
-    """
-    Gymnasium Environment wrapping ROS 2 & Gazebo Sim Racetrack.
-    """
     metadata = {'render_modes': []}
 
     def __init__(self, random_spawn=True, max_steps=1000):
@@ -84,8 +85,7 @@ class RacetrackEnv(gym.Env):
         self.random_spawn = random_spawn
         self.max_steps = max_steps
 
-        # Definir Espacios de Accion y Observacion
-        # Accion: [angulo (-0.5 a 0.5 rad), velocidad (0.12 a 0.40 m/s)]
+        # Espacio de Accion: [angulo (-0.5 a 0.5 rad), velocidad (0.12 a 0.40 m/s)]
         self.action_space = spaces.Box(
             low=np.array([-0.50, 0.12], dtype=np.float32),
             high=np.array([0.50, 0.40], dtype=np.float32),
@@ -118,7 +118,9 @@ class RacetrackEnv(gym.Env):
         self.current_step = 0
         self.is_crashed = False
 
-        # Esperar a recibir el primer scan de LiDAR
+        self.just_reset = False
+        self.reset_time = time.time()
+
         time.sleep(1.0)
 
     def _spin_node(self):
@@ -135,7 +137,9 @@ class RacetrackEnv(gym.Env):
             obs.append(min(r, 10.0) / 10.0)
         self.latest_scan = np.array(obs, dtype=np.float32)
 
-        # Detectar colision frontal
+        if time.time() - self.reset_time < 0.4:
+            return
+
         front_start = len(msg.ranges) // 3
         front_end = 2 * len(msg.ranges) // 3
         for r in msg.ranges[front_start:front_end]:
@@ -144,8 +148,16 @@ class RacetrackEnv(gym.Env):
                 break
 
     def _on_odom(self, msg):
-        self.car_x = msg.pose.pose.position.x
-        self.car_y = msg.pose.pose.position.y
+        x = msg.pose.pose.position.x
+        y = msg.pose.pose.position.y
+        if self.just_reset:
+            if time.time() - self.reset_time < 0.4:
+                return
+            else:
+                self.just_reset = False
+
+        self.car_x = x
+        self.car_y = y
         self.car_yaw = euler_yaw(
             msg.pose.pose.orientation.x,
             msg.pose.pose.orientation.y,
@@ -157,6 +169,8 @@ class RacetrackEnv(gym.Env):
         super().reset(seed=seed)
         self.current_step = 0
         self.is_crashed = False
+        self.just_reset = True
+        self.reset_time = time.time()
 
         # Detener vehiculo
         stop = Twist()
@@ -170,6 +184,11 @@ class RacetrackEnv(gym.Env):
 
         sz = math.sin(angle / 2.0)
         cz = math.cos(angle / 2.0)
+
+        # Actualizar posicion interna INMEDIATAMENTE para evitar falso chequeo de choque en step(0)
+        self.car_x = px
+        self.car_y = py
+        self.car_yaw = angle
 
         # Secuencia PAUSE -> SET_POSE -> UNPAUSE
         req_pause = 'pause: true'
@@ -187,7 +206,8 @@ class RacetrackEnv(gym.Env):
         except Exception:
             pass
 
-        time.sleep(0.1)
+        time.sleep(0.15)
+        self.is_crashed = False
 
         obs = self.latest_scan if self.latest_scan is not None else np.ones(8, dtype=np.float32)
         info = {}
@@ -206,6 +226,11 @@ class RacetrackEnv(gym.Env):
         # Esperar ciclo de control (50 ms)
         time.sleep(0.05)
 
+        # Si estamos dentro de la ventana de amortiguacion post-reset, dar recompensa neutra
+        if time.time() - self.reset_time < 0.4:
+            obs = self.latest_scan if self.latest_scan is not None else np.ones(8, dtype=np.float32)
+            return obs, 0.1, False, False, {}
+
         # Evaluar estado
         dist_to_center, seg_angle = self.track.localize(self.car_x, self.car_y)
         raw_diff = seg_angle - self.car_yaw
@@ -215,7 +240,6 @@ class RacetrackEnv(gym.Env):
         truncated = self.current_step >= self.max_steps
 
         # Recompensa tipo AWS DeepRacer:
-        # Recompensa avance alineado con la pista, penaliza desviacion del centro y choque
         progress_reward = speed * math.cos(angle_diff)
         center_penalty = 0.5 * abs(dist_to_center)
         reward = progress_reward - center_penalty

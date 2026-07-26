@@ -5,7 +5,6 @@ Script de entrenamiento de PPO utilizando Stable-Baselines3 y RacetrackEnv.
 
 import os
 import sys
-import argparse
 
 def main():
     try:
@@ -38,7 +37,7 @@ def main():
         name_prefix="ppo_racetrack_model"
     )
 
-    # Configurar Agente PPO
+    # Configurar Agente PPO en CPU (mucho mas rapido para MLP pequeñas)
     model = PPO(
         policy="MlpPolicy",
         env=env,
@@ -51,6 +50,7 @@ def main():
         clip_range=0.2,
         ent_coef=0.01,
         verbose=1,
+        device="cpu",
         tensorboard_log=log_dir
     )
 
