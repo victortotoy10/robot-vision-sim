@@ -22,7 +22,9 @@ setup(
         'console_scripts': [
             'vision_sim_node = sim_vision_test.vision_sim_node:main',
             'data_recorder_node = sim_vision_test.data_recorder:main',
-            'neural_pilot_node = sim_vision_test.neural_pilot_node:main'
+            'neural_pilot_node = sim_vision_test.neural_pilot_node:main',
+            'evolutionary_trainer = sim_vision_test.evolutionary_trainer:main',
+            'evolutionary_pilot = sim_vision_test.evolutionary_pilot:main'
         ],
     },
 )
