@@ -4,8 +4,7 @@ Entrenador Evolutivo Avanzado con Control de Trayectoria.
 Fixes:
 1. Modulo bug en calculo de diferencia angular (atan2 sin/cos).
 2. Limite de giro respetando URDF Ackermann (max 0.5 rad).
-3. Reset ultra-robusto probando variantes de nombres ("racer_robot" y "my_robot")
-   para corregir el error [UserCommands.cc:1465] Unable to update pose for entity id:[0].
+3. Reset OFICIAL de Gazebo Sim usando /world/racetrack/control (WorldControl: reset all).
 """
 
 import rclpy
@@ -86,7 +85,6 @@ MAX_STEER = 0.5  # Respetando limite del URDF (0.6 rad)
 
 MODEL_DIR = os.path.expanduser('~/evolutionary_models')
 
-# Posiciones de spawn
 SPAWN_X = 0.0
 SPAWN_Y = -0.25
 SPAWN_Z = 0.15
@@ -183,7 +181,7 @@ class EvolutionaryTrainerNode(Node):
         self.warmup_count = 0
 
         self.get_logger().info('='*60)
-        self.get_logger().info('   ENTRENADOR EVOLUTIVO AVANZADO (CORREGIDO ENTITY NAME)')
+        self.get_logger().info('   ENTRENADOR EVOLUTIVO AVANZADO (WORLD CONTROL RESET)')
         self.get_logger().info('='*60)
 
     def on_lidar(self, msg):
@@ -201,7 +199,7 @@ class EvolutionaryTrainerNode(Node):
 
         self.latest_lidar = [v / 10.0 for v in values]
 
-        if time.time() - self.reset_time < 0.4:
+        if time.time() - self.reset_time < 0.5:
             return
 
         front_start = len(msg.ranges) // 3
@@ -223,7 +221,7 @@ class EvolutionaryTrainerNode(Node):
 
         if self.just_reset:
             dist_to_spawn = math.sqrt((x - SPAWN_X)**2 + (y - SPAWN_Y)**2)
-            if dist_to_spawn > 0.5 and (time.time() - self.reset_time < 0.4):
+            if dist_to_spawn > 0.5 and (time.time() - self.reset_time < 0.5):
                 return
             else:
                 self.just_reset = False
@@ -241,7 +239,7 @@ class EvolutionaryTrainerNode(Node):
         if not self.warmup_done or self.latest_lidar is None:
             return
 
-        if time.time() - self.reset_time < 0.4:
+        if time.time() - self.reset_time < 0.5:
             stop = Twist()
             self.cmd_pub.publish(stop)
             return
@@ -370,51 +368,29 @@ class EvolutionaryTrainerNode(Node):
         self.last_y = self.car_y
 
     def reset_car_position(self):
-        offset_x = random.uniform(-0.10, 0.10)
-        offset_y = random.uniform(-0.04, 0.04)
-        yaw = random.uniform(-0.05, 0.05)
-        sz = math.sin(yaw / 2.0)
-        cz = math.cos(yaw / 2.0)
-
-        px = SPAWN_X + offset_x
-        py = SPAWN_Y + offset_y
-        pz = SPAWN_Z
-
-        self.car_x = px
-        self.car_y = py
-        self.car_yaw = yaw
+        self.car_x = SPAWN_X
+        self.car_y = SPAWN_Y
+        self.car_yaw = 0.0
         self.just_reset = True
         self.reset_time = time.time()
 
-        # Probar los dos nombres posibles del modelo en Gazebo Sim (racer_robot y my_robot)
-        candidate_names = ["racer_robot", "my_robot", "racer"]
-        worlds = ["racetrack", "camera_world"]
+        # Servicio Oficial WorldControl de Gazebo Sim
+        req_proto = 'reset: { all: true }'
 
-        success = False
-        for name in candidate_names:
-            req_proto = (
-                f'name: "{name}" '
-                f'position {{ x: {px:.4f} y: {py:.4f} z: {pz:.4f} }} '
-                f'orientation {{ x: 0.0 y: 0.0 z: {sz:.4f} w: {cz:.4f} }}'
-            )
-            for w in worlds:
-                cmd = ['ign', 'service', '-s', f'/world/{w}/set_pose',
-                       '--reqtype', 'ignition.msgs.Pose',
-                       '--reptype', 'ignition.msgs.Boolean',
-                       '--timeout', '300',
-                       '--req', req_proto]
-                try:
-                    res = subprocess.run(cmd, capture_output=True, text=True, timeout=0.8)
-                    if res.returncode == 0 and "Unable to update" not in res.stderr:
-                        success = True
-                        break
-                except Exception:
-                    continue
-            if success:
-                break
+        cmds = [
+            ['ign', 'service', '-s', '/world/racetrack/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '1000', '--req', req_proto],
+            ['gz', 'service', '-s', '/world/racetrack/control', '--reqtype', 'gz.msgs.WorldControl', '--reptype', 'gz.msgs.Boolean', '--timeout', '1000', '--req', req_proto],
+            ['ign', 'service', '-s', '/world/camera_world/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '1000', '--req', req_proto],
+            ['gz', 'service', '-s', '/world/camera_world/control', '--reqtype', 'gz.msgs.WorldControl', '--reptype', 'gz.msgs.Boolean', '--timeout', '1000', '--req', req_proto],
+        ]
 
-        if not success:
-            self.get_logger().warn('Advertencia: No se pudo verificar la confirmacion de set_pose.')
+        for cmd in cmds:
+            try:
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=1.5)
+                if res.returncode == 0:
+                    break
+            except Exception:
+                continue
 
 
 def main(args=None):
@@ -430,3 +406,4 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+PYEOF
