@@ -414,5 +414,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-PYEOF
-echo "evolutionary_trainer.py corregido completamente"
