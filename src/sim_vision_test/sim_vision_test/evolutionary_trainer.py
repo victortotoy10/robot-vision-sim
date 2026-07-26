@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
 """
-Entrenador Evolutivo Adaptado 1:1 de ar-tu-do-master para ROS 2 + Gazebo Sim.
-
-Arquitectura ar-tu-do-master:
-- Red Neuronal: Linear(8, 8) -> ReLU -> Linear(8, 8) -> ReLU -> Linear(8, 2) -> Tanh
-- 8 muestras de LiDAR.
-- Velocidad: [0.10, 0.40] m/s (conservadora y precisa).
-- Direccion: [-0.5, 0.5] rad.
-- Reset: PAUSE -> SET_POSE (en punto aleatorio de la pista) -> UNPAUSE.
+Entrenador Evolutivo Avanzado (Método de Hijos / ar-tu-do-master).
+Fixes:
+1. Eliminado set_pose (que daba error id:[0]). Usa WorldControl reset oficial.
+2. Eliminada auto-colisión LiDAR de 14cm (misma corrección que en racetrack_env).
 """
 
 import rclpy
@@ -25,9 +21,7 @@ import random
 import subprocess
 import time
 
-# ============================================================
-# WAYPOINTS DE LA PISTA RACETRACK (Eje central de la carretera)
-# ============================================================
+# Waypoints de la pista Racetrack
 PATH_POINTS = np.array([
     [2.64, -0.36], [6.08, -0.33], [7.64, -0.15], [9.10, 0.41], [10.31, 1.39],
     [11.13, 2.72], [11.56, 4.23], [11.67, 5.79], [11.65, 12.07], [11.14, 13.52],
@@ -51,19 +45,6 @@ class Track:
         self.length = np.sum(self.segment_length)
         self.forward = relative / self.segment_length[:, np.newaxis]
         self.right = np.array([self.forward[:, 1], -self.forward[:, 0]]).transpose()
-        self.cumulative_distance = np.zeros(len(points))
-        self.cumulative_distance[1:] = np.cumsum(self.segment_length)
-
-    def get_random_spawn(self):
-        idx = random.randint(0, self.size - 1)
-        p = self.points[idx]
-        fwd = self.forward[idx]
-        angle = math.atan2(fwd[1], fwd[0])
-        # Agregar pequeño offset aleatorio [-5cm, +5cm]
-        offset = random.uniform(-0.05, 0.05)
-        px = p[0] + self.right[idx, 0] * offset
-        py = p[1] + self.right[idx, 1] * offset
-        return px, py, angle
 
     def localize(self, px, py):
         local = np.array([px, py]) - self.points
@@ -87,28 +68,27 @@ def euler_yaw(x, y, z, w):
 
 
 STATE_SIZE = 8
-POPULATION_SIZE = 10
-SURVIVOR_COUNT = 4
+POPULATION_SIZE = 25
+SURVIVOR_COUNT = 5
 MAX_EPISODE_STEPS = 2000
-MUTATION_RATE = 0.10
+MUTATION_RATE = 0.15
 
-MIN_SPEED = 0.12
-MAX_SPEED = 0.40
+MIN_SPEED = 0.15
+MAX_SPEED = 0.45
 MAX_STEER = 0.50
 
 MODEL_DIR = os.path.expanduser('~/evolutionary_models')
-GAZEBO_MODEL_NAME = 'racer_robot'
 
 
 class NeuralDriver(nn.Module):
     def __init__(self):
         super(NeuralDriver, self).__init__()
         self.layers = nn.Sequential(
-            nn.Linear(STATE_SIZE, 8),
+            nn.Linear(STATE_SIZE, 16),
             nn.ReLU(),
-            nn.Linear(8, 8),
+            nn.Linear(16, 16),
             nn.ReLU(),
-            nn.Linear(8, 2),
+            nn.Linear(16, 2),
             nn.Tanh()
         )
         self.fitness = 0.0
@@ -191,7 +171,7 @@ class EvolutionaryTrainerNode(Node):
         self.warmup_count = 0
 
         self.get_logger().info('='*60)
-        self.get_logger().info('   ENTRENADOR EVOLUTIVO (FIEL A AR-TU-DO-MASTER 1:1)')
+        self.get_logger().info('   ENTRENADOR EVOLUTIVO GENÉTICO (25 INDIVIDUOS / MÉTODOS DE HIJOS)')
         self.get_logger().info('='*60)
 
     def on_lidar(self, msg):
@@ -203,22 +183,11 @@ class EvolutionaryTrainerNode(Node):
         values = []
         for i in self.scan_indices:
             v = msg.ranges[i]
-            if math.isinf(v) or math.isnan(v) or v <= 0.10:
+            if math.isinf(v) or math.isnan(v) or v <= 0.18:
                 v = 10.0
             values.append(min(v, 10.0))
 
         self.latest_lidar = [v / 10.0 for v in values]
-
-        if time.time() - self.reset_time < 0.5:
-            return
-
-        front_start = len(msg.ranges) // 3
-        front_end = 2 * len(msg.ranges) // 3
-        for r in msg.ranges[front_start:front_end]:
-            if not math.isinf(r) and not math.isnan(r) and 0.105 < r < 0.20:
-                self.is_crashed = True
-                self.crash_reason = f"CHOQUE FÍSICO (LiDAR: {r:.2f}m)"
-                break
 
         if not self.warmup_done:
             self.warmup_count += 1
@@ -230,7 +199,7 @@ class EvolutionaryTrainerNode(Node):
         y = msg.pose.pose.position.y
 
         if self.just_reset:
-            if time.time() - self.reset_time < 0.5:
+            if time.time() - self.reset_time < 0.4:
                 return
             else:
                 self.just_reset = False
@@ -248,7 +217,7 @@ class EvolutionaryTrainerNode(Node):
         if not self.warmup_done or self.latest_lidar is None:
             return
 
-        if time.time() - self.reset_time < 0.5:
+        if time.time() - self.reset_time < 0.4:
             stop = Twist()
             self.cmd_pub.publish(stop)
             return
@@ -337,7 +306,7 @@ class EvolutionaryTrainerNode(Node):
             best_path = os.path.join(MODEL_DIR, 'best_driver.pth')
             best.save(best_path)
             self.get_logger().info(
-                f'  ★ NUEVO RECORD! Fitness: {best.fitness:.1f} → Guardado en best_driver.pth')
+                f'  ★ NUEVO RECORD DE VERDAD! Fitness: {best.fitness:.1f} → Guardado en best_driver.pth')
 
         self.get_logger().info('='*60)
 
@@ -377,34 +346,18 @@ class EvolutionaryTrainerNode(Node):
         self.last_y = self.car_y
 
     def reset_car_position(self):
-        # Seleccionar spawn aleatorio a lo largo de la pista (como ar-tu-do-master)
-        px, py, angle = self.track.get_random_spawn()
-        sz = math.sin(angle / 2.0)
-        cz = math.cos(angle / 2.0)
-
-        self.car_x = px
-        self.car_y = py
-        self.car_yaw = angle
+        self.car_x = 0.0
+        self.car_y = -0.25
+        self.car_yaw = 0.0
         self.just_reset = True
         self.reset_time = time.time()
 
-        req_pause = 'pause: true'
-        req_unpause = 'pause: false'
-        req_pose = (
-            f'name: "{GAZEBO_MODEL_NAME}" '
-            f'position {{ x: {px:.4f} y: {py:.4f} z: 0.15 }} '
-            f'orientation {{ x: 0.0 y: 0.0 z: {sz:.4f} w: {cz:.4f} }}'
-        )
+        req_reset = 'pause: false reset: { model_only: true }'
 
         try:
-            # 1. Pausar física
-            subprocess.run(['ign', 'service', '-s', '/world/racetrack/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '300', '--req', req_pause], capture_output=True, timeout=0.8)
-            # 2. Teletransportar modelo
-            subprocess.run(['ign', 'service', '-s', '/world/racetrack/set_pose', '--reqtype', 'ignition.msgs.Pose', '--reptype', 'ignition.msgs.Boolean', '--timeout', '500', '--req', req_pose], capture_output=True, timeout=1.0)
-            # 3. Despausar física
-            subprocess.run(['ign', 'service', '-s', '/world/racetrack/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '300', '--req', req_unpause], capture_output=True, timeout=0.8)
-        except Exception as e:
-            self.get_logger().warn(f'Error en el ciclo de reset: {e}')
+            subprocess.run(['ign', 'service', '-s', '/world/racetrack/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '500', '--req', req_reset], capture_output=True, timeout=1.0)
+        except Exception:
+            pass
 
 
 def main(args=None):
