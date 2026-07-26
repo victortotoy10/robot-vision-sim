@@ -354,10 +354,11 @@ class EvolutionaryTrainerNode(Node):
 
         req_reset = 'pause: false reset: { model_only: true }'
 
-        try:
-            subprocess.run(['ign', 'service', '-s', '/world/racetrack/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '500', '--req', req_reset], capture_output=True, timeout=1.0)
-        except Exception:
-            pass
+        for world_name in ['racetrack', 'oval_track', 'camera_world']:
+            try:
+                subprocess.run(['ign', 'service', '-s', f'/world/{world_name}/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '500', '--req', req_reset], capture_output=True, timeout=1.0)
+            except Exception:
+                pass
 
 
 def main(args=None):

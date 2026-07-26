@@ -47,8 +47,8 @@ class NeuralPilotNode(Node):
         self.bridge = CvBridge()
 
         # Parametros de velocidad configurables en tiempo real
-        self.declare_parameter('base_speed', 1.0)
-        self.declare_parameter('max_angular_speed', 2.5)
+        self.declare_parameter('base_speed', 0.50)
+        self.declare_parameter('max_angular_speed', 0.70)
         self.declare_parameter('reverse_threshold', -0.15)
 
         # Cargar modelo entrenado
@@ -87,8 +87,8 @@ class NeuralPilotNode(Node):
                 outputs = prediction.cpu().numpy()[0]
 
             # Desnormalizar predicciones
-            raw_linear = float(outputs[0]) * 2.0
-            raw_angular = float(outputs[1]) * 3.0
+            raw_linear = float(outputs[0]) * 0.50
+            raw_angular = float(outputs[1]) * 0.70
 
             # Parametros
             base_speed = self.get_parameter('base_speed').value

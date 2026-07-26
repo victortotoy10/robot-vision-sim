@@ -108,6 +108,17 @@ def generate_launch_description():
         launch_arguments={'gz_args': gz_args_str}.items()
     )
 
+    world_name_arg = 'racetrack'
+    for a in sys.argv:
+        if a.startswith('world:='):
+            world_name_arg = a.split(':=', 1)[1]
+            break
+
+    if world_name_arg == 'oval_track':
+        spawn_x, spawn_y, spawn_z, spawn_yaw = '5.0', '0.0', '0.1', '1.5708'
+    else:
+        spawn_x, spawn_y, spawn_z, spawn_yaw = '0.0', '-0.25', '0.1', '0.0'
+
     # Spawn the robot from /robot_description
     spawn_robot = Node(
         package='ros_gz_sim',
@@ -115,10 +126,10 @@ def generate_launch_description():
         arguments=[
             '-name', 'my_robot',
             '-topic', '/robot_description',
-            '-x', '5.0',
-            '-y', '0.0',
-            '-z', '0.1',
-            '-Y', '1.5708'
+            '-x', spawn_x,
+            '-y', spawn_y,
+            '-z', spawn_z,
+            '-Y', spawn_yaw
         ],
         output='screen'
     )

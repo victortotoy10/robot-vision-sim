@@ -33,6 +33,7 @@ def main():
     try:
         from stable_baselines3 import PPO
         from stable_baselines3.common.callbacks import CheckpointCallback
+        from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack
     except ImportError:
         print("[ERROR] Stable-Baselines3 no está instalado. Ejecuta:")
         print("  pip install stable-baselines3 gymnasium tensorboard")
@@ -49,8 +50,19 @@ def main():
     print("\n   INICIANDO ENTRENAMIENTO PPO EN GPU (CUDA: Tesla T4)")
     print("=" * 60)
 
-    # Crear Entorno Gymnasium
-    env = RacetrackEnv(random_spawn=False, max_steps=1500)
+    # Crear Entorno Gymnasium con Frame Stacking (n_stack=4, 56 dims efectivas)
+    env = DummyVecEnv([lambda: RacetrackEnv(random_spawn=False, max_steps=1500)])
+    env = VecFrameStack(env, n_stack=4)
+
+    print("=" * 60)
+    print(f"Observation space: {env.observation_space}")
+    print(f"Action space: {env.action_space}")
+    print(f"Frame stack: 4")
+    print(f"Dim efectiva de observación: {env.observation_space.shape}")
+    print("=" * 60)
+    obs = env.reset()
+    print(f"Primera obs shape: {obs.shape}")
+    print("=" * 60)
 
     # Callback para guardar checkpoints cada 10,000 pasos
     checkpoint_callback = CheckpointCallback(
