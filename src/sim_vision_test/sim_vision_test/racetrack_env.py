@@ -2,7 +2,7 @@
 """
 Entorno Gymnasium personalizado para ROS 2 + Gazebo Sim (Racetrack).
 Compatible con Stable-Baselines3 (PPO, SAC, DDPG, TD3).
-Fix: Reset oficial de Gazebo Sim usando WorldControl para evitar errores de id:[0] en SetPose.
+Fix: Reset de modelo usando WorldControl model_only para evitar reinicios de reloj / clock warnings.
 """
 
 import gymnasium as gym
@@ -168,8 +168,8 @@ class RacetrackEnv(gym.Env):
         self.car_y = -0.25
         self.car_yaw = 0.0
 
-        # Reset Oficial WorldControl de Gazebo Sim (100% libre de errores id:[0])
-        req_reset = 'pause: false reset: { all: true }'
+        # Resetear solo modelos (model_only: true) para evitar saltos en el reloj de simulación
+        req_reset = 'pause: false reset: { model_only: true }'
 
         try:
             subprocess.run(['ign', 'service', '-s', '/world/racetrack/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '500', '--req', req_reset], capture_output=True, timeout=1.0)
