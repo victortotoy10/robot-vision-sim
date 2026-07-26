@@ -84,10 +84,10 @@ class RacetrackEnv(gym.Env):
             dtype=np.float32
         )
 
-        # 2. Observaciones completas Markovianas (12 dimensiones):
-        # 8 rayos LiDAR normalizados + 4 estados cinematicos/temporales
+        # 2. Observaciones completas Markovianas (14 dimensiones):
+        # 8 rayos LiDAR normalizados + 4 estados cinematicos/temporales + 2 features de peligro
         self.observation_space = spaces.Box(
-            low=-2.0, high=2.0, shape=(12,), dtype=np.float32
+            low=-2.0, high=2.0, shape=(14,), dtype=np.float32
         )
 
         # ROS 2 Setup
@@ -115,6 +115,9 @@ class RacetrackEnv(gym.Env):
         self.last_speed = 0.0
         self.last_progress = 0.0
         self.current_step = 0
+
+        self._stuck_counter = 0
+        self._prev_pos = None
 
         self.just_reset = False
         self.reset_time = time.time()
@@ -166,13 +169,21 @@ class RacetrackEnv(gym.Env):
             self.last_steer / 0.70,        # Accion de giro anterior
             self.last_speed / 0.50         # Accion de velocidad anterior
         ], dtype=np.float32)
-        return np.concatenate([lidar, kinematics])
+        
+        # Features de peligro destacados (FIX 3)
+        min_lidar_frontal = float(min(lidar[3], lidar[4]))
+        min_lidar_global = float(np.min(lidar))
+        danger_features = np.array([min_lidar_frontal, min_lidar_global], dtype=np.float32)
+
+        return np.concatenate([lidar, kinematics, danger_features])
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.current_step = 0
         self.just_reset = True
         self.reset_time = time.time()
+        self._stuck_counter = 0
+        self._prev_pos = None
 
         # Detener vehiculo
         stop = Twist()
@@ -221,6 +232,16 @@ class RacetrackEnv(gym.Env):
         if time.time() - self.reset_time < 0.4:
             return self._get_obs(), 0.0, False, False, {}
 
+        # Detección de atasco (FIX 1)
+        current_pos = np.array([self.car_x, self.car_y])
+        if self._prev_pos is not None:
+            delta_dist = np.linalg.norm(current_pos - self._prev_pos)
+            if delta_dist < 0.01:  # movió menos de 1cm en un step
+                self._stuck_counter += 1
+            else:
+                self._stuck_counter = 0
+        self._prev_pos = current_pos.copy()
+
         # Evaluar estado en el circuito circular/oval
         # Centro del carril en radio 5.0m
         radius = math.sqrt(self.car_x**2 + self.car_y**2)
@@ -242,14 +263,25 @@ class RacetrackEnv(gym.Env):
         elif delta_theta < -np.pi:
             delta_theta += 2 * np.pi
             
-        # Solo cuenta avance contra-reloj (delta_theta > 0)
-        delta_s = 5.0 * delta_theta   # arco = radio × ángulo
-        progress_reward = max(0.0, delta_s) * 10.0
+        # Arco = radio × ángulo
+        delta_s = 5.0 * delta_theta
+
+        # Reward simétrico para retroceso (FIX 5)
+        if delta_s > 0:
+            progress_reward = delta_s * 10.0        # avanzar
+        else:
+            progress_reward = delta_s * 5.0         # retroceder
         
         terminated = False
         truncated = self.current_step >= self.max_steps
 
         reward = progress_reward - 0.3 * abs(dist_to_center) - 0.005
+
+        # Penalización gradual por proximidad a paredes (FIX 2)
+        min_lidar = float(np.min(self.latest_scan)) if self.latest_scan is not None else 1.0
+        if min_lidar < 0.3:
+            proximity_penalty = -2.0 * (0.3 - min_lidar) / 0.3
+            reward += proximity_penalty
 
         # Detección de vuelta completa (cruzó de +π a -π yendo contra-reloj)
         if delta_theta > 0 and abs(theta_t - self._theta_prev + 2*np.pi) < 0.1:
@@ -259,6 +291,15 @@ class RacetrackEnv(gym.Env):
 
         self._theta_prev = theta_t
 
+        # Detección de atasco temprano (FIX 1)
+        if self._stuck_counter > 30:
+            reward -= 5.0
+            terminated = True
+            info_reason = "stuck"
+            print(f"[STUCK] Episodio terminado en step {self.current_step} por atasco")
+        else:
+            info_reason = "collision_or_offtrack"
+
         # Choque o sentido contrario (ancho de carril 2m -> limite 0.85m del centro)
         if abs(dist_to_center) > 0.85:
             terminated = True
@@ -267,17 +308,22 @@ class RacetrackEnv(gym.Env):
             terminated = True
             reward = -5.0
 
+        if terminated:
+            print(f"[END] step={self.current_step} reason={info_reason} reward_final={reward:.2f}")
+
         if self.current_step % 50 == 0:
             obs_check = self._get_obs()
             print(f"[OBS DEBUG] LiDAR min/max: {obs_check[:8].min():.2f}/{obs_check[:8].max():.2f} | "
                   f"v_norm: {obs_check[8]:.2f} | w_norm: {obs_check[9]:.2f} | "
-                  f"steer_prev: {obs_check[10]:.2f} | speed_prev: {obs_check[11]:.2f}")
+                  f"steer_prev: {obs_check[10]:.2f} | speed_prev: {obs_check[11]:.2f} | "
+                  f"frontal_danger: {obs_check[12]:.2f} | global_danger: {obs_check[13]:.2f}")
 
         info = {
             "dist_to_center": dist_to_center,
             "delta_progress": delta_s,
             "speed": speed,
-            "steer": steer
+            "steer": steer,
+            "termination_reason": info_reason
         }
 
         return self._get_obs(), reward, terminated, truncated, info
