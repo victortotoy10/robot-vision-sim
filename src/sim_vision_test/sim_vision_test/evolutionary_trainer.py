@@ -3,6 +3,7 @@
 Entrenador Evolutivo Avanzado con Control de Trayectoria.
 Usa los waypoints de la pista para evitar que el carro haga trampa (girar en circulos)
 y detecta colisiones virtuales si se sale de la pista.
+Incluye proteccion contra condiciones de carrera de teleportacion.
 """
 
 import rclpy
@@ -87,7 +88,7 @@ MAX_EPISODE_STEPS = 2000
 MUTATION_RATE = 0.15
 
 MIN_SPEED = 0.3
-MAX_SPEED = 0.8  # Reducido un poco para estabilidad de aprendizaje
+MAX_SPEED = 0.8
 
 MODEL_DIR = os.path.expanduser('~/evolutionary_models')
 GAZEBO_MODEL_NAME = 'my_robot'
@@ -178,6 +179,10 @@ class EvolutionaryTrainerNode(Node):
         self.last_y = 0.0
         self.distance_traveled = 0.0
 
+        # Control de sincronizacion (evita condiciones de carrera)
+        self.just_reset = False
+        self.reset_time = time.time()
+
         # Algoritmo genetico
         self.generation = 0
         self.individual_idx = 0
@@ -213,8 +218,11 @@ class EvolutionaryTrainerNode(Node):
 
         self.latest_lidar = [v / 10.0 for v in values]
 
+        # Ignorar choques durante el periodo de gracia tras teleportar (evita lecturas fantasmas)
+        if time.time() - self.reset_time < 0.4:
+            return
+
         # 1. Choque Fisico LiDAR (Si hay un objeto muy cerca en el frente del LiDAR)
-        # 12cm del sensor es el limite seguro de contacto del parachoques F1
         front_start = len(msg.ranges) // 3
         front_end = 2 * len(msg.ranges) // 3
         for r in msg.ranges[front_start:front_end]:
@@ -229,8 +237,19 @@ class EvolutionaryTrainerNode(Node):
                 self.warmup_done = True
 
     def on_odom(self, msg):
-        self.car_x = msg.pose.pose.position.x
-        self.car_y = msg.pose.pose.position.y
+        x = msg.pose.pose.position.x
+        y = msg.pose.pose.position.y
+
+        # Ignorar mensajes de odometria del estado anterior al teleport
+        if self.just_reset:
+            dist_to_spawn = math.sqrt((x - SPAWN_X)**2 + (y - SPAWN_Y)**2)
+            if dist_to_spawn > 0.5 and (time.time() - self.reset_time < 0.4):
+                return
+            else:
+                self.just_reset = False
+
+        self.car_x = x
+        self.car_y = y
         self.car_yaw = euler_yaw(
             msg.pose.pose.orientation.x,
             msg.pose.pose.orientation.y,
@@ -240,6 +259,13 @@ class EvolutionaryTrainerNode(Node):
 
     def training_step(self):
         if not self.warmup_done or self.latest_lidar is None:
+            return
+
+        # Periodo de gracia para estabilizacion fisica del carro al caer al suelo
+        if time.time() - self.reset_time < 0.4:
+            # Detener el carro durante el periodo de gracia
+            stop = Twist()
+            self.cmd_pub.publish(stop)
             return
 
         # 2. Control de Posición en la Pista (Evitar salirse de la carretera)
@@ -360,7 +386,6 @@ class EvolutionaryTrainerNode(Node):
     def reset_episode(self):
         stop = Twist()
         self.cmd_pub.publish(stop)
-        time.sleep(0.05)
 
         self.episode_steps = 0
         self.is_crashed = False
@@ -369,7 +394,6 @@ class EvolutionaryTrainerNode(Node):
         self.current_driver.total_velocity = 0.0
 
         self.reset_car_position()
-        time.sleep(0.15)
         self.last_x = self.car_x
         self.last_y = self.car_y
 
@@ -380,9 +404,16 @@ class EvolutionaryTrainerNode(Node):
         sz = math.sin(yaw / 2.0)
         cz = math.cos(yaw / 2.0)
 
+        # Forzar variables inmediatamente para evitar leer datos viejos de odom
+        self.car_x = SPAWN_X + offset_x
+        self.car_y = SPAWN_Y + offset_y
+        self.car_yaw = yaw
+        self.just_reset = True
+        self.reset_time = time.time()
+
         req = (
             f'name: "{GAZEBO_MODEL_NAME}" '
-            f'position: {{x: {SPAWN_X + offset_x}, y: {SPAWN_Y + offset_y}, z: {SPAWN_Z}}} '
+            f'position: {{x: {self.car_x}, y: {self.car_y}, z: {SPAWN_Z}}} '
             f'orientation: {{x: 0, y: 0, z: {sz:.4f}, w: {cz:.4f}}}'
         )
 
