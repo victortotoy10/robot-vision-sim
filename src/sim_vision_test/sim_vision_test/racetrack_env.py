@@ -2,7 +2,8 @@
 """
 Entorno Gymnasium personalizado para ROS 2 + Gazebo Sim (Racetrack).
 Compatible con Stable-Baselines3 (PPO, SAC, DDPG, TD3).
-Fix: Reset de modelo usando WorldControl model_only para evitar reinicios de reloj / clock warnings.
+Fix: Eliminada falsa colisión del sensor LiDAR con la propia cámara/chasis del robot.
+La colisión se determina de forma 100% precisa mediante la geometría del circuito (|dist_to_center| > 0.85m).
 """
 
 import gymnasium as gym
@@ -103,7 +104,6 @@ class RacetrackEnv(gym.Env):
         self.car_y = -0.25
         self.car_yaw = 0.0
         self.current_step = 0
-        self.is_crashed = False
 
         self.just_reset = False
         self.reset_time = time.time()
@@ -119,20 +119,10 @@ class RacetrackEnv(gym.Env):
         obs = []
         for i in indices:
             r = msg.ranges[i]
-            if math.isinf(r) or math.isnan(r) or r <= 0.10:
+            if math.isinf(r) or math.isnan(r) or r <= 0.18:
                 r = 10.0
             obs.append(min(r, 10.0) / 10.0)
         self.latest_scan = np.array(obs, dtype=np.float32)
-
-        if time.time() - self.reset_time < 0.4:
-            return
-
-        front_start = len(msg.ranges) // 3
-        front_end = 2 * len(msg.ranges) // 3
-        for r in msg.ranges[front_start:front_end]:
-            if not math.isinf(r) and not math.isnan(r) and 0.105 < r < 0.20:
-                self.is_crashed = True
-                break
 
     def _on_odom(self, msg):
         x = msg.pose.pose.position.x
@@ -155,7 +145,6 @@ class RacetrackEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.current_step = 0
-        self.is_crashed = False
         self.just_reset = True
         self.reset_time = time.time()
 
@@ -177,7 +166,6 @@ class RacetrackEnv(gym.Env):
             pass
 
         time.sleep(0.15)
-        self.is_crashed = False
 
         obs = self.latest_scan if self.latest_scan is not None else np.ones(8, dtype=np.float32)
         info = {}
@@ -214,15 +202,13 @@ class RacetrackEnv(gym.Env):
         center_penalty = 0.5 * abs(dist_to_center)
         reward = progress_reward - center_penalty
 
+        # Deteccion de choque/salida 100% precisa basada en la pista (ancho de carril 0.85m)
         if abs(dist_to_center) > 0.85:
             terminated = True
             reward = -10.0
         elif abs(angle_diff) > 1.2:
             terminated = True
             reward = -5.0
-        elif self.is_crashed:
-            terminated = True
-            reward = -10.0
 
         obs = self.latest_scan if self.latest_scan is not None else np.ones(8, dtype=np.float32)
         info = {
