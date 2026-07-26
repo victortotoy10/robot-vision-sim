@@ -346,18 +346,19 @@ class EvolutionaryTrainerNode(Node):
         self.last_y = self.car_y
 
     def reset_car_position(self):
-        self.car_x = 0.0
-        self.car_y = -0.25
-        self.car_yaw = 0.0
+        self.car_x = 5.0
+        self.car_y = 0.0
+        self.car_yaw = 1.5708
         self.just_reset = True
         self.reset_time = time.time()
 
         req_reset = 'pause: false reset: { model_only: true }'
 
-        try:
-            subprocess.run(['ign', 'service', '-s', '/world/racetrack/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '500', '--req', req_reset], capture_output=True, timeout=1.0)
-        except Exception:
-            pass
+        for world_name in ['racetrack', 'oval_track', 'camera_world']:
+            try:
+                subprocess.run(['ign', 'service', '-s', f'/world/{world_name}/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '500', '--req', req_reset], capture_output=True, timeout=1.0)
+            except Exception:
+                pass
 
 
 def main(args=None):
