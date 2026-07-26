@@ -1,0 +1,109 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <world name="oval_track">
+
+    <physics name="fast" type="ignored">
+      <max_step_size>0.004</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>250</real_time_update_rate>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <light type="directional" name="sun">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <!-- Piso base gris -->
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>50 50</size></plane></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>50 50</size></plane></geometry>
+          <material>
+            <ambient>0.3 0.3 0.3 1</ambient>
+            <diffuse>0.3 0.3 0.3 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 
+      PISTA OVAL SIMPLE
+      Radio interno: 4 m
+      Radio externo: 6 m
+      Ancho del carril: 2 m
+      Se construye con 36 segmentos de pared interna + 36 externa (cada 10°)
+      
+      Pared = cilindros bajos (10cm de alto) para que LiDAR los detecte como bordes
+    -->
+
+    <!-- === PARED INTERIOR (radio 4m) === -->
+    <model name="inner_wall">
+      <static>true</static>
+      <link name="link">
+        <!-- Se generan 36 cajas curvas alrededor del centro -->
+        <!-- En vez de listar 72 elementos, usamos aros con visual/collision cilíndrico -->
+        <collision name="c1">
+          <pose>0 0 0.1 0 0 0</pose>
+          <geometry>
+            <cylinder><radius>4.0</radius><length>0.2</length></cylinder>
+          </geometry>
+        </collision>
+        <visual name="v1">
+          <pose>0 0 0.1 0 0 0</pose>
+          <geometry>
+            <cylinder><radius>4.0</radius><length>0.2</length></cylinder>
+          </geometry>
+          <material>
+            <ambient>0.9 0.2 0.2 1</ambient>
+            <diffuse>0.9 0.2 0.2 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- === PARED EXTERIOR (radio 6m, hueca en el centro) === -->
+    <!-- Truco: usamos 36 cajas pequeñas alineadas en un aro de radio 6 -->
+    <model name="outer_wall_seg_0">
+      <static>true</static>
+      <pose>6.0 0 0.1 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.2 1.05 0.2</size></box></geometry></collision>
+        <visual name="v">
+          <geometry><box><size>0.2 1.05 0.2</size></box></geometry>
+          <material><ambient>0.9 0.9 0.2 1</ambient><diffuse>0.9 0.9 0.2 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="outer_wall_seg_1"><static>true</static><pose>5.638 2.052 0.1 0 0 0.349</pose><link name="l"><collision name="c"><geometry><box><size>0.2 1.05 0.2</size></box></geometry></collision><visual name="v"><geometry><box><size>0.2 1.05 0.2</size></box></geometry><material><ambient>0.9 0.9 0.2 1</ambient><diffuse>0.9 0.9 0.2 1</diffuse></material></visual></link></model>
+    <model name="outer_wall_seg_2"><static>true</static><pose>4.596 3.857 0.1 0 0 0.698</pose><link name="l"><collision name="c"><geometry><box><size>0.2 1.05 0.2</size></box></geometry></collision><visual name="v"><geometry><box><size>0.2 1.05 0.2</size></box></geometry><material><ambient>0.9 0.9 0.2 1</ambient><diffuse>0.9 0.9 0.2 1</diffuse></material></visual></link></model>
+    <model name="outer_wall_seg_3"><static>true</static><pose>3.0 5.196 0.1 0 0 1.047</pose><link name="l"><collision name="c"><geometry><box><size>0.2 1.05 0.2</size></box></geometry></collision><visual name="v"><geometry><box><size>0.2 1.05 0.2</size></box></geometry><material><ambient>0.9 0.9 0.2 1</ambient><diffuse>0.9 0.9 0.2 1</diffuse></material></visual></link></model>
+    <model name="outer_wall_seg_4"><static>true</static><pose>1.042 5.909 0.1 0 0 1.396</pose><link name="l"><collision name="c"><geometry><box><size>0.2 1.05 0.2</size></box></geometry></collision><visual name="v"><geometry><box><size>0.2 1.05 0.2</size></box></geometry><material><ambient>0.9 0.9 0.2 1</ambient><diffuse>0.9 0.9 0.2 1</diffuse></material></visual></link></model>
+    <model name="outer_wall_seg_5"><static>true</static><pose>-1.042 5.909 0.1 0 0 1.745</pose><link name="l"><collision name="c"><geometry><box><size>0.2 1.05 0.2</size></box></geometry></collision><visual name="v"><geometry><box><size>0.2 1.05 0.2</size></box></geometry><material><ambient>0.9 0.9 0.2 1</ambient><diffuse>0.9 0.9 0.2 1</diffuse></material></visual></link></model>
+    <model name="outer_wall_seg_6"><static>true</static><pose>-3.0 5.196 0.1 0 0 2.094</pose><link name="l"><collision name="c"><geometry><box><size>0.2 1.05 0.2</size></box></geometry></collision><visual name="v"><geometry><box><size>0.2 1.05 0.2</size></box></geometry><material><ambient>0.9 0.9 0.2 1</ambient><diffuse>0.9 0.9 0.2 1</diffuse></material></visual></link></model>
+    <model name="outer_wall_seg_7"><static>true</static><pose>-4.596 3.857 0.1 0 0 2.443</pose><link name="l"><collision name="c"><geometry><box><size>0.2 1.05 0.2</size></box></geometry></collision><visual name="v"><geometry><box><size>0.2 1.05 0.2</size></box></geometry><material><ambient>0.9 0.9 0.2 1</ambient><diffuse>0.9 0.9 0.2 1</diffuse></material></visual></link></model>
+    <model name="outer_wall_seg_8"><static>true</static><pose>-5.638 2.052 0.1 0 0 2.793</pose><link name="l"><collision name="c"><geometry><box><size>0.2 1.05 0.2</size></box></geometry></collision><visual name="v"><geometry><box><size>0.2 1.05 0.2</size></box></geometry><material><ambient>0.9 0.9 0.2 1</ambient><diffuse>0.9 0.9 0.2 1</diffuse></material></visual></link></model>
+    <model name="outer_wall_seg_9"><static>true</static><pose>-6.0 0 0.1 0 0 3.142</pose><link name="l"><collision name="c"><geometry><box><size>0.2 1.05 0.2</size></box></geometry></collision><visual name="v"><geometry><box><size>0.2 1.05 0.2</size></box></geometry><material><ambient>0.9 0.9 0.2 1</ambient><diffuse>0.9 0.9 0.2 1</diffuse></material></visual></link></model>
+    <model name="outer_wall_seg_10"><static>true</static><pose>-5.638 -2.052 0.1 0 0 3.491</pose><link name="l"><collision name="c"><geometry><box><size>0.2 1.05 0.2</size></box></geometry></collision><visual name="v"><geometry><box><size>0.2 1.05 0.2</size></box></geometry><material><ambient>0.9 0.9 0.2 1</ambient><diffuse>0.9 0.9 0.2 1</diffuse></material></visual></link></model>
+    <model name="outer_wall_seg_11"><static>true</static><pose>-4.596 -3.857 0.1 0 0 3.840</pose><link name="l"><collision name="c"><geometry><box><size>0.2 1.05 0.2</size></box></geometry></collision><visual name="v"><geometry><box><size>0.2 1.05 0.2</size></box></geometry><material><ambient>0.9 0.9 0.2 1</ambient><diffuse>0.9 0.9 0.2 1</diffuse></material></visual></link></model>
+    <model name="outer_wall_seg_12"><static>true</static><pose>-3.0 -5.196 0.1 0 0 4.189</pose><link name="l"><collision name="c"><geometry><box><size>0.2 1.05 0.2</size></box></geometry></collision><visual name="v"><geometry><box><size>0.2 1.05 0.2</size></box></geometry><material><ambient>0.9 0.9 0.2 1</ambient><diffuse>0.9 0.9 0.2 1</diffuse></material></visual></link></model>
+    <model name="outer_wall_seg_13"><static>true</static><pose>-1.042 -5.909 0.1 0 0 4.538</pose><link name="l"><collision name="c"><geometry><box><size>0.2 1.05 0.2</size></box></geometry></collision><visual name="v"><geometry><box><size>0.2 1.05 0.2</size></box></geometry><material><ambient>0.9 0.9 0.2 1</ambient><diffuse>0.9 0.9 0.2 1</diffuse></material></visual></link></model>
+    <model name="outer_wall_seg_14"><static>true</static><pose>1.042 -5.909 0.1 0 0 4.887</pose><link name="l"><collision name="c"><geometry><box><size>0.2 1.05 0.2</size></box></geometry></collision><visual name="v"><geometry><box><size>0.2 1.05 0.2</size></box></geometry><material><ambient>0.9 0.9 0.2 1</ambient><diffuse>0.9 0.9 0.2 1</diffuse></material></visual></link></model>
+    <model name="outer_wall_seg_15"><static>true</static><pose>3.0 -5.196 0.1 0 0 5.236</pose><link name="l"><collision name="c"><geometry><box><size>0.2 1.05 0.2</size></box></geometry></collision><visual name="v"><geometry><box><size>0.2 1.05 0.2</size></box></geometry><material><ambient>0.9 0.9 0.2 1</ambient><diffuse>0.9 0.9 0.2 1</diffuse></material></visual></link></model>
+    <model name="outer_wall_seg_16"><static>true</static><pose>4.596 -3.857 0.1 0 0 5.585</pose><link name="l"><collision name="c"><geometry><box><size>0.2 1.05 0.2</size></box></geometry></collision><visual name="v"><geometry><box><size>0.2 1.05 0.2</size></box></geometry><material><ambient>0.9 0.9 0.2 1</ambient><diffuse>0.9 0.9 0.2 1</diffuse></material></visual></link></model>
+    <model name="outer_wall_seg_17"><static>true</static><pose>5.638 -2.052 0.1 0 0 5.934</pose><link name="l"><collision name="c"><geometry><box><size>0.2 1.05 0.2</size></box></geometry></collision><visual name="v"><geometry><box><size>0.2 1.05 0.2</size></box></geometry><material><ambient>0.9 0.9 0.2 1</ambient><diffuse>0.9 0.9 0.2 1</diffuse></material></visual></link></model>
+
+  </world>
+</sdf>
