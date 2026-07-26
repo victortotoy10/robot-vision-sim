@@ -346,9 +346,9 @@ class EvolutionaryTrainerNode(Node):
         self.last_y = self.car_y
 
     def reset_car_position(self):
-        self.car_x = 5.0
-        self.car_y = 0.0
-        self.car_yaw = 1.5708
+        self.car_x = 0.0
+        self.car_y = -0.25
+        self.car_yaw = 0.0
         self.just_reset = True
         self.reset_time = time.time()
 
