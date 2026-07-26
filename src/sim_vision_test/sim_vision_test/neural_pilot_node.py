@@ -9,7 +9,7 @@ import os
 import torch
 import torch.nn as nn
 
-# Modelo CNN con 2 salidas
+# Modelo CNN con 2 salidas normalizadas
 class RacerCNN(nn.Module):
     def __init__(self):
         super(RacerCNN, self).__init__()
@@ -46,6 +46,11 @@ class NeuralPilotNode(Node):
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         self.bridge = CvBridge()
 
+        # Parametros de velocidad configurables en tiempo real
+        self.declare_parameter('base_speed', 1.0)
+        self.declare_parameter('max_angular_speed', 2.5)
+        self.declare_parameter('reverse_threshold', -0.15)
+
         # Cargar modelo entrenado
         model_path = os.path.expanduser('~/training_data/racer_model.pth')
         
@@ -53,7 +58,7 @@ class NeuralPilotNode(Node):
         self.get_logger().info(f"Dispositivo de ejecucion de IA: {self.device}")
 
         if not os.path.exists(model_path):
-            self.get_logger().error(f"ERROR: No se encontro el archivo del modelo en {model_path}")
+            self.get_logger().error(f"ERROR: No se encontro el modelo en {model_path}")
             raise FileNotFoundError("Modelo racer_model.pth no encontrado.")
 
         self.model = RacerCNN()
@@ -64,7 +69,7 @@ class NeuralPilotNode(Node):
         self.sub = self.create_subscription(
             Image, '/camera/image_raw', self.image_callback, 10)
 
-        self.get_logger().info("Autopiloto de Red Neuronal (Ackermann con Reversa) iniciado.")
+        self.get_logger().info("Autopiloto Hibrido (IA Direccion + Control Velocidad) iniciado.")
 
     def image_callback(self, msg):
         try:
@@ -81,18 +86,37 @@ class NeuralPilotNode(Node):
                 prediction = self.model(img_tensor)
                 outputs = prediction.cpu().numpy()[0]
 
-            # --- DESNORMALIZACIÓN DE ESCALAS ---
-            # Multiplicamos por la inversa de la normalizacion para restaurar valores reales
-            predicted_linear_x = float(outputs[0]) * 2.0
-            predicted_angular_z = float(outputs[1]) * 3.0
+            # Desnormalizar predicciones
+            raw_linear = float(outputs[0]) * 2.0
+            raw_angular = float(outputs[1]) * 3.0
+
+            # Parametros
+            base_speed = self.get_parameter('base_speed').value
+            max_ang = self.get_parameter('max_angular_speed').value
+            rev_thr = self.get_parameter('reverse_threshold').value
+
+            # --- SISTEMA HIBRIDO: IA DIRIGE, REGLA CONTROLA VELOCIDAD ---
+            # La IA controla la direccion (angular_z) - esto lo aprendio bien
+            angular_z = float(np.clip(raw_angular, -max_ang, max_ang))
+
+            # La velocidad se calcula de forma inteligente:
+            if raw_linear < rev_thr:
+                # La IA detecta que debe retroceder (reversa aprendida)
+                linear_x = float(np.clip(raw_linear, -0.4, -0.1))
+                mode = "REVERSA"
+            else:
+                # Velocidad proporcional: rapido en rectas, lento en curvas
+                turn_ratio = abs(angular_z) / max_ang
+                linear_x = base_speed * max(0.25, 1.0 - 0.7 * turn_ratio)
+                mode = "AVANCE"
 
             # Publicar velocidades
             twist = Twist()
-            twist.linear.x = float(np.clip(predicted_linear_x, -0.4, 2.0))
-            twist.angular.z = float(np.clip(predicted_angular_z, -3.0, 3.0))
+            twist.linear.x = linear_x
+            twist.angular.z = angular_z
             self.cmd_pub.publish(twist)
 
-            print(f"IA Prediccion -> Velocidad: {twist.linear.x:+.2f} m/s | Giro: {twist.angular.z:+.2f} rad/s", flush=True)
+            print(f"[{mode:7s}] Vel: {twist.linear.x:+.2f} m/s | Giro: {twist.angular.z:+.2f} rad/s | (IA raw: lin={raw_linear:+.2f} ang={raw_angular:+.2f})", flush=True)
 
         except Exception as e:
             self.get_logger().error(f"Error en piloto de IA: {e}")
