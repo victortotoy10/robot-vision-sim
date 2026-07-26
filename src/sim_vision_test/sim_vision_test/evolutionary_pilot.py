@@ -2,6 +2,9 @@
 """
 Piloto Autónomo Evolutivo: Usa el mejor cerebro evolucionado para conducir.
 Carga el modelo 'best_driver.pth' entrenado por el algoritmo genético.
+
+Fixes:
+- Direccion ajustada a max 0.5 rad para respetar limites fisicos de Ackermann del URDF.
 """
 
 import rclpy
@@ -14,15 +17,14 @@ import numpy as np
 import math
 import os
 
-# Mismos parámetros que en el entrenador
 LIDAR_SAMPLES = 10
-MIN_SPEED = 0.3
-MAX_SPEED = 1.2
+MIN_SPEED = 0.25
+MAX_SPEED = 0.55
+MAX_STEER = 0.5
 MODEL_DIR = os.path.expanduser('~/evolutionary_models')
 
 
 class NeuralDriver(nn.Module):
-    """Misma arquitectura que el entrenador evolutivo."""
     def __init__(self):
         super(NeuralDriver, self).__init__()
         self.layers = nn.Sequential(
@@ -38,7 +40,7 @@ class NeuralDriver(nn.Module):
         with torch.no_grad():
             state = torch.tensor(lidar_data, dtype=torch.float32)
             output = self.layers(state)
-        angle = output[0].item() * 2.5
+        angle = output[0].item() * MAX_STEER
         speed_norm = output[1].item()
         speed = MIN_SPEED + (speed_norm + 1.0) / 2.0 * (MAX_SPEED - MIN_SPEED)
         return angle, speed
@@ -68,7 +70,7 @@ class EvolutionaryPilotNode(Node):
         self.scan_sub = self.create_subscription(
             LaserScan, '/scan', self.on_lidar, 10)
 
-        self.get_logger().info('Piloto Autónomo Evolutivo (LiDAR) iniciado.')
+        self.get_logger().info('Piloto Autónomo Evolutivo iniciado.')
 
     def on_lidar(self, msg):
         if self.scan_indices is None:
@@ -101,8 +103,6 @@ def main(args=None):
         node = EvolutionaryPilotNode()
         rclpy.spin(node)
     except KeyboardInterrupt:
-        pass
-    except FileNotFoundError:
         pass
     finally:
         if rclpy.ok():
