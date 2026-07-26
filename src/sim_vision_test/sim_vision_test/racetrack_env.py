@@ -2,10 +2,7 @@
 """
 Entorno Gymnasium personalizado para ROS 2 + Gazebo Sim (Racetrack).
 Compatible con Stable-Baselines3 (PPO, SAC, DDPG, TD3).
-Fixes:
-1. Sincronizacion inmediata de posicion al hacer reset.
-2. Ignorar lecturas viejas de odom/scan durante los primeros 0.5s tras el reset.
-3. Eliminacion de bucle instantaneo de choques (ep_len_mean fixed).
+Fix: Reset oficial de Gazebo Sim usando WorldControl para evitar errores de id:[0] en SetPose.
 """
 
 import gymnasium as gym
@@ -47,16 +44,6 @@ class Track:
         self.forward = relative / self.segment_length[:, np.newaxis]
         self.right = np.array([self.forward[:, 1], -self.forward[:, 0]]).transpose()
 
-    def get_random_spawn(self):
-        idx = np.random.randint(0, self.size)
-        p = self.points[idx]
-        fwd = self.forward[idx]
-        angle = math.atan2(fwd[1], fwd[0])
-        offset = np.random.uniform(-0.05, 0.05)
-        px = p[0] + self.right[idx, 0] * offset
-        py = p[1] + self.right[idx, 1] * offset
-        return px, py, angle
-
     def localize(self, px, py):
         local = np.array([px, py]) - self.points
         x = local[:, 0] * self.right[:, 0] + local[:, 1] * self.right[:, 1]
@@ -80,7 +67,7 @@ def euler_yaw(x, y, z, w):
 class RacetrackEnv(gym.Env):
     metadata = {'render_modes': []}
 
-    def __init__(self, random_spawn=True, max_steps=1000):
+    def __init__(self, random_spawn=False, max_steps=1500):
         super().__init__()
         self.random_spawn = random_spawn
         self.max_steps = max_steps
@@ -176,33 +163,16 @@ class RacetrackEnv(gym.Env):
         stop = Twist()
         self.cmd_pub.publish(stop)
 
-        # Determinar posicion inicial
-        if self.random_spawn:
-            px, py, angle = self.track.get_random_spawn()
-        else:
-            px, py, angle = 0.0, -0.25, 0.0
+        # Actualizar posicion inicial estimada
+        self.car_x = 0.0
+        self.car_y = -0.25
+        self.car_yaw = 0.0
 
-        sz = math.sin(angle / 2.0)
-        cz = math.cos(angle / 2.0)
-
-        # Actualizar posicion interna INMEDIATAMENTE para evitar falso chequeo de choque en step(0)
-        self.car_x = px
-        self.car_y = py
-        self.car_yaw = angle
-
-        # Secuencia PAUSE -> SET_POSE -> UNPAUSE
-        req_pause = 'pause: true'
-        req_unpause = 'pause: false'
-        req_pose = (
-            f'name: "racer_robot" '
-            f'position {{ x: {px:.4f} y: {py:.4f} z: 0.15 }} '
-            f'orientation {{ x: 0.0 y: 0.0 z: {sz:.4f} w: {cz:.4f} }}'
-        )
+        # Reset Oficial WorldControl de Gazebo Sim (100% libre de errores id:[0])
+        req_reset = 'pause: false reset: { all: true }'
 
         try:
-            subprocess.run(['ign', 'service', '-s', '/world/racetrack/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '300', '--req', req_pause], capture_output=True, timeout=0.8)
-            subprocess.run(['ign', 'service', '-s', '/world/racetrack/set_pose', '--reqtype', 'ignition.msgs.Pose', '--reptype', 'ignition.msgs.Boolean', '--timeout', '500', '--req', req_pose], capture_output=True, timeout=1.0)
-            subprocess.run(['ign', 'service', '-s', '/world/racetrack/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '300', '--req', req_unpause], capture_output=True, timeout=0.8)
+            subprocess.run(['ign', 'service', '-s', '/world/racetrack/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '500', '--req', req_reset], capture_output=True, timeout=1.0)
         except Exception:
             pass
 
@@ -226,7 +196,7 @@ class RacetrackEnv(gym.Env):
         # Esperar ciclo de control (50 ms)
         time.sleep(0.05)
 
-        # Si estamos dentro de la ventana de amortiguacion post-reset, dar recompensa neutra
+        # Si estamos dentro de la ventana post-reset, retornar recompensa neutra
         if time.time() - self.reset_time < 0.4:
             obs = self.latest_scan if self.latest_scan is not None else np.ones(8, dtype=np.float32)
             return obs, 0.1, False, False, {}
