@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 Entrenador Evolutivo Avanzado con Control de Trayectoria.
-Usa los waypoints de la pista para evitar que el carro haga trampa (girar en circulos)
-y detecta colisiones virtuales si se sale de la pista.
-Incluye proteccion contra condiciones de carrera de teleportacion.
+Fixes:
+1. Modulo bug en calculo de diferencia angular (atan2 sin/cos).
+2. Limite de giro respetando URDF Ackermann (max 0.5 rad).
 """
 
 import rclpy
@@ -20,7 +20,6 @@ import os
 import random
 import subprocess
 import time
-import json
 
 # ============================================================
 # WAYPOINTS DE LA PISTA RACETRACK (Eje central de la carretera)
@@ -38,9 +37,6 @@ PATH_POINTS = np.array([
     [-13.44, 0.92], [-11.90, 0.65], [-9.02, 0.66], [-6.00, -0.17], [2.64, -0.36]
 ])
 
-# ============================================================
-# CLASE DE LOCALIZACIÓN DE PISTA (Previene giros en circulos)
-# ============================================================
 class Track:
     def __init__(self, points):
         self.points = points[:-1, :]
@@ -55,7 +51,6 @@ class Track:
         self.cumulative_distance[1:] = np.cumsum(self.segment_length)
 
     def localize(self, px, py):
-        """Calcula la distancia al centro de la pista y el angulo del segmento."""
         local = np.array([px, py]) - self.points
         x = local[:, 0] * self.right[:, 0] + local[:, 1] * self.right[:, 1]
         y = local[:, 0] * self.forward[:, 0] + local[:, 1] * self.forward[:, 1]
@@ -65,44 +60,37 @@ class Track:
         
         segment = np.argmin(distances)
         if distances[segment] == float("Inf"):
-            return 999.0, 0.0 # Fuera de la pista
+            return 999.0, 0.0
             
         return x[segment], math.atan2(self.forward[segment, 1], self.forward[segment, 0])
 
 
 def euler_yaw(x, y, z, w):
-    """Convierte quaternion de ROS a yaw (angulo z)."""
     siny_cosp = 2 * (w * z + x * y)
     cosy_cosp = 1 - 2 * (y * y + z * z)
     return math.atan2(siny_cosp, cosy_cosp)
 
 
-# ============================================================
-# HIPERPARÁMETROS DEL ENTRENAMIENTO
-# ============================================================
 LIDAR_SAMPLES = 10
 POPULATION_SIZE = 25
 SURVIVOR_COUNT = 5
-INITIAL_POPULATION = 80     # Mayor poblacion inicial para encontrar el camino
+INITIAL_POPULATION = 60
 MAX_EPISODE_STEPS = 2000
 MUTATION_RATE = 0.15
 
 MIN_SPEED = 0.3
 MAX_SPEED = 0.8
+MAX_STEER = 0.5  # Respetando limite del URDF (0.6 rad)
 
 MODEL_DIR = os.path.expanduser('~/evolutionary_models')
 GAZEBO_MODEL_NAME = 'my_robot'
 GAZEBO_WORLD_NAME = 'racetrack'
 
-# Posición alineada con la pista en el tramo de salida
 SPAWN_X = 0.0
 SPAWN_Y = -0.25
 SPAWN_Z = 0.15
 
 
-# ============================================================
-# CEREBRO NEURONAL
-# ============================================================
 class NeuralDriver(nn.Module):
     def __init__(self):
         super(NeuralDriver, self).__init__()
@@ -121,10 +109,10 @@ class NeuralDriver(nn.Module):
         with torch.no_grad():
             state = torch.tensor(lidar_data, dtype=torch.float32)
             output = self.layers(state)
-        angle = output[0].item()
+        angle = output[0].item() * MAX_STEER
         speed_norm = output[1].item()
         speed = MIN_SPEED + (speed_norm + 1.0) / 2.0 * (MAX_SPEED - MIN_SPEED)
-        return angle * 2.5, speed
+        return angle, speed
 
     def to_vector(self):
         state_dict = self.layers.state_dict()
@@ -153,9 +141,6 @@ class NeuralDriver(nn.Module):
         torch.save(self.state_dict(), filepath)
 
 
-# ============================================================
-# NODO ENTRENADOR
-# ============================================================
 class EvolutionaryTrainerNode(Node):
     def __init__(self):
         super().__init__('evolutionary_trainer')
@@ -169,21 +154,18 @@ class EvolutionaryTrainerNode(Node):
         self.odom_sub = self.create_subscription(
             Odometry, '/odom', self.on_odom, 10)
 
-        # Estado físico
         self.scan_indices = None
         self.latest_lidar = None
-        self.car_x = 0.0
-        self.car_y = 0.0
+        self.car_x = SPAWN_X
+        self.car_y = SPAWN_Y
         self.car_yaw = 0.0
-        self.last_x = 0.0
-        self.last_y = 0.0
+        self.last_x = SPAWN_X
+        self.last_y = SPAWN_Y
         self.distance_traveled = 0.0
 
-        # Control de sincronizacion (evita condiciones de carrera)
         self.just_reset = False
         self.reset_time = time.time()
 
-        # Algoritmo genetico
         self.generation = 0
         self.individual_idx = 0
         self.episode_steps = 0
@@ -200,7 +182,7 @@ class EvolutionaryTrainerNode(Node):
         self.warmup_count = 0
 
         self.get_logger().info('='*60)
-        self.get_logger().info('   ENTRENADOR EVOLUTIVO CON VÍAS DE CONTROL INICIADO')
+        self.get_logger().info('   ENTRENADOR EVOLUTIVO AVANZADO CORREGIDO')
         self.get_logger().info('='*60)
 
     def on_lidar(self, msg):
@@ -218,11 +200,9 @@ class EvolutionaryTrainerNode(Node):
 
         self.latest_lidar = [v / 10.0 for v in values]
 
-        # Ignorar choques durante el periodo de gracia tras teleportar (evita lecturas fantasmas)
         if time.time() - self.reset_time < 0.4:
             return
 
-        # 1. Choque Fisico LiDAR (Si hay un objeto muy cerca en el frente del LiDAR)
         front_start = len(msg.ranges) // 3
         front_end = 2 * len(msg.ranges) // 3
         for r in msg.ranges[front_start:front_end]:
@@ -240,7 +220,6 @@ class EvolutionaryTrainerNode(Node):
         x = msg.pose.pose.position.x
         y = msg.pose.pose.position.y
 
-        # Ignorar mensajes de odometria del estado anterior al teleport
         if self.just_reset:
             dist_to_spawn = math.sqrt((x - SPAWN_X)**2 + (y - SPAWN_Y)**2)
             if dist_to_spawn > 0.5 and (time.time() - self.reset_time < 0.4):
@@ -261,32 +240,29 @@ class EvolutionaryTrainerNode(Node):
         if not self.warmup_done or self.latest_lidar is None:
             return
 
-        # Periodo de gracia para estabilizacion fisica del carro al caer al suelo
         if time.time() - self.reset_time < 0.4:
-            # Detener el carro durante el periodo de gracia
             stop = Twist()
             self.cmd_pub.publish(stop)
             return
 
-        # 2. Control de Posición en la Pista (Evitar salirse de la carretera)
+        # 2. Control de Posicion
         dist_to_center, seg_angle = self.track.localize(self.car_x, self.car_y)
         
-        # Si se aleja mas de 0.85m del centro (ancho pista ~1.6m), se considera choque virtual
         if abs(dist_to_center) > 0.85:
             self.is_crashed = True
             self.crash_reason = f"SALIDA DE PISTA ({abs(dist_to_center):.2f}m)"
             self.end_episode()
             return
 
-        # 3. Control de Orientacion (Evita girar en circulos)
-        angle_diff = (seg_angle - self.car_yaw) % (2 * math.pi) - math.pi
-        if abs(angle_diff) > 1.2:  # Desviado mas de ~70 grados del sentido correcto
+        # 3. Control de Orientacion CORREGIDO (atan2 sin/cos)
+        raw_diff = seg_angle - self.car_yaw
+        angle_diff = math.atan2(math.sin(raw_diff), math.cos(raw_diff))
+        if abs(angle_diff) > 1.2:  # Desviado mas de ~70 grados
             self.is_crashed = True
             self.crash_reason = f"SENTIDO INCORRECTO ({abs(angle_diff)*180/math.pi:.0f}°)"
             self.end_episode()
             return
 
-        # Epoca normal
         if self.is_crashed or self.episode_steps >= MAX_EPISODE_STEPS:
             self.end_episode()
             return
@@ -300,7 +276,6 @@ class EvolutionaryTrainerNode(Node):
 
         self.current_driver.total_velocity += abs(linear_x)
 
-        # Distancia recorrida
         dx = self.car_x - self.last_x
         dy = self.car_y - self.last_y
         self.distance_traveled += math.sqrt(dx*dx + dy*dy)
@@ -312,11 +287,9 @@ class EvolutionaryTrainerNode(Node):
     def end_episode(self):
         avg_velocity = (self.current_driver.total_velocity / max(self.episode_steps, 1))
         
-        # Penalizacion si muere al instante
         if self.episode_steps < 8:
             self.current_driver.fitness = 0.0
         else:
-            # Fitness basado en avanzar en la direccion correcta
             self.current_driver.fitness = self.distance_traveled * avg_velocity
 
         reason = self.crash_reason if self.is_crashed else "MAX PASOS"
@@ -360,10 +333,8 @@ class EvolutionaryTrainerNode(Node):
 
         self.get_logger().info('='*60)
 
-        # Seleccion
         survivors = self.tested[:SURVIVOR_COUNT]
 
-        # Hijos mutados
         children = []
         num_children = POPULATION_SIZE - SURVIVOR_COUNT
         for _ in range(num_children):
@@ -404,7 +375,6 @@ class EvolutionaryTrainerNode(Node):
         sz = math.sin(yaw / 2.0)
         cz = math.cos(yaw / 2.0)
 
-        # Forzar variables inmediatamente para evitar leer datos viejos de odom
         self.car_x = SPAWN_X + offset_x
         self.car_y = SPAWN_Y + offset_y
         self.car_yaw = yaw
@@ -444,3 +414,5 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+PYEOF
+echo "evolutionary_trainer.py corregido completamente"
