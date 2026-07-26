@@ -4,7 +4,8 @@ Entrenador Evolutivo Avanzado con Control de Trayectoria.
 Fixes:
 1. Modulo bug en calculo de diferencia angular (atan2 sin/cos).
 2. Limite de giro respetando URDF Ackermann (max 0.5 rad).
-3. Reset ultra-robusto probando variantes de ign y gz service para prevenir bloqueos de posicion.
+3. Reset ultra-robusto probando variantes de nombres ("racer_robot" y "my_robot")
+   para corregir el error [UserCommands.cc:1465] Unable to update pose for entity id:[0].
 """
 
 import rclpy
@@ -84,8 +85,8 @@ MAX_SPEED = 0.8
 MAX_STEER = 0.5  # Respetando limite del URDF (0.6 rad)
 
 MODEL_DIR = os.path.expanduser('~/evolutionary_models')
-GAZEBO_MODEL_NAME = 'my_robot'
 
+# Posiciones de spawn
 SPAWN_X = 0.0
 SPAWN_Y = -0.25
 SPAWN_Z = 0.15
@@ -182,7 +183,7 @@ class EvolutionaryTrainerNode(Node):
         self.warmup_count = 0
 
         self.get_logger().info('='*60)
-        self.get_logger().info('   ENTRENADOR EVOLUTIVO AVANZADO MULTI-SERVICE')
+        self.get_logger().info('   ENTRENADOR EVOLUTIVO AVANZADO (CORREGIDO ENTITY NAME)')
         self.get_logger().info('='*60)
 
     def on_lidar(self, msg):
@@ -385,39 +386,35 @@ class EvolutionaryTrainerNode(Node):
         self.just_reset = True
         self.reset_time = time.time()
 
-        # Variantes de sintaxis de comandos de servicio de Gazebo
-        req_proto = (
-            f'name: "{GAZEBO_MODEL_NAME}" '
-            f'position {{ x: {px:.4f} y: {py:.4f} z: {pz:.4f} }} '
-            f'orientation {{ x: 0.0 y: 0.0 z: {sz:.4f} w: {cz:.4f} }}'
-        )
-        req_json = (
-            f'name: "{GAZEBO_MODEL_NAME}" '
-            f'position: {{x: {px:.4f}, y: {py:.4f}, z: {pz:.4f}}} '
-            f'orientation: {{x: 0.0, y: 0.0, z: {sz:.4f}, w: {cz:.4f}}}'
-        )
-
-        cmds = [
-            ['ign', 'service', '-s', '/world/racetrack/set_pose', '--reqtype', 'ignition.msgs.Pose', '--reptype', 'ignition.msgs.Boolean', '--timeout', '500', '--req', req_proto],
-            ['ign', 'service', '-s', '/world/racetrack/set_pose', '--reqtype', 'ignition.msgs.Pose', '--reptype', 'ignition.msgs.Boolean', '--timeout', '500', '--req', req_json],
-            ['gz', 'service', '-s', '/world/racetrack/set_pose', '--reqtype', 'gz.msgs.Pose', '--reptype', 'gz.msgs.Boolean', '--timeout', '500', '--req', req_proto],
-            ['gz', 'service', '-s', '/world/racetrack/set_pose', '--reqtype', 'gz.msgs.Pose', '--reptype', 'gz.msgs.Boolean', '--timeout', '500', '--req', req_json],
-            ['ign', 'service', '-s', '/world/camera_world/set_pose', '--reqtype', 'ignition.msgs.Pose', '--reptype', 'ignition.msgs.Boolean', '--timeout', '500', '--req', req_proto],
-            ['gz', 'service', '-s', '/world/camera_world/set_pose', '--reqtype', 'gz.msgs.Pose', '--reptype', 'gz.msgs.Boolean', '--timeout', '500', '--req', req_proto],
-        ]
+        # Probar los dos nombres posibles del modelo en Gazebo Sim (racer_robot y my_robot)
+        candidate_names = ["racer_robot", "my_robot", "racer"]
+        worlds = ["racetrack", "camera_world"]
 
         success = False
-        for cmd in cmds:
-            try:
-                res = subprocess.run(cmd, capture_output=True, text=True, timeout=1.5)
-                if res.returncode == 0 and ('true' in res.stdout.lower() or 'success' in res.stdout.lower() or res.stdout.strip() == ''):
-                    success = True
-                    break
-            except Exception:
-                continue
+        for name in candidate_names:
+            req_proto = (
+                f'name: "{name}" '
+                f'position {{ x: {px:.4f} y: {py:.4f} z: {pz:.4f} }} '
+                f'orientation {{ x: 0.0 y: 0.0 z: {sz:.4f} w: {cz:.4f} }}'
+            )
+            for w in worlds:
+                cmd = ['ign', 'service', '-s', f'/world/{w}/set_pose',
+                       '--reqtype', 'ignition.msgs.Pose',
+                       '--reptype', 'ignition.msgs.Boolean',
+                       '--timeout', '300',
+                       '--req', req_proto]
+                try:
+                    res = subprocess.run(cmd, capture_output=True, text=True, timeout=0.8)
+                    if res.returncode == 0 and "Unable to update" not in res.stderr:
+                        success = True
+                        break
+                except Exception:
+                    continue
+            if success:
+                break
 
         if not success:
-            self.get_logger().warn('No se pudo resetear la posición en Gazebo. Revisa la simulación.')
+            self.get_logger().warn('Advertencia: No se pudo verificar la confirmacion de set_pose.')
 
 
 def main(args=None):
