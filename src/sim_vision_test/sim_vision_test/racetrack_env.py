@@ -178,22 +178,25 @@ class RacetrackEnv(gym.Env):
         stop = Twist()
         self.cmd_pub.publish(stop)
 
-        self.car_x = 0.0
-        self.car_y = -0.25
-        self.car_yaw = 0.0
+        # Spawn inicial sobre el carril de la pista oval
+        self.car_x = 5.0
+        self.car_y = 0.0
+        self.car_yaw = 1.5708
         self.car_vx = 0.0
         self.car_wz = 0.0
         self.last_steer = 0.0
         self.last_speed = 0.0
         
-        _, _, self.last_progress = self.track.localize(0.0, -0.25)
+        self._theta_prev = np.arctan2(self.car_y, self.car_x)
+        self._vueltas = 0
 
-        # Reset Oficial Gazebo Sim
+        # Reset Oficial Gazebo Sim (se intentan todos los nombres de mundos activos)
         req_reset = 'pause: false reset: { model_only: true }'
-        try:
-            subprocess.run(['ign', 'service', '-s', '/world/racetrack/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '500', '--req', req_reset], capture_output=True, timeout=1.0)
-        except Exception:
-            pass
+        for world_name in ['racetrack', 'oval_track', 'camera_world']:
+            try:
+                subprocess.run(['ign', 'service', '-s', f'/world/{world_name}/control', '--reqtype', 'ignition.msgs.WorldControl', '--reptype', 'ignition.msgs.Boolean', '--timeout', '500', '--req', req_reset], capture_output=True, timeout=1.0)
+            except Exception:
+                pass
 
         time.sleep(0.15)
         return self._get_obs(), {}
@@ -218,36 +221,45 @@ class RacetrackEnv(gym.Env):
         if time.time() - self.reset_time < 0.4:
             return self._get_obs(), 0.0, False, False, {}
 
-        # Evaluar estado en el circuito
-        dist_to_center, seg_angle, current_progress = self.track.localize(self.car_x, self.car_y)
+        # Evaluar estado en el circuito circular/oval
+        # Centro del carril en radio 5.0m
+        radius = math.sqrt(self.car_x**2 + self.car_y**2)
+        dist_to_center = radius - 5.0
+        
+        # El angulo del segmento (tangente) es theta + pi/2
+        theta_t = np.arctan2(self.car_y, self.car_x)
+        seg_angle = theta_t + math.pi / 2.0
+        seg_angle = math.atan2(math.sin(seg_angle), math.cos(seg_angle))
+        
         raw_diff = seg_angle - self.car_yaw
         angle_diff = math.atan2(math.sin(raw_diff), math.cos(raw_diff))
 
-        # Calcular avance longitudinal real en metros
-        delta_progress = current_progress - self.last_progress
-        if delta_progress < -self.track.length / 2.0:
-            delta_progress += self.track.length
-        elif delta_progress > self.track.length / 2.0:
-            delta_progress -= self.track.length
+        delta_theta = theta_t - self._theta_prev
+        
+        # Corrección de wrap-around en ±π
+        if delta_theta > np.pi:
+            delta_theta -= 2 * np.pi
+        elif delta_theta < -np.pi:
+            delta_theta += 2 * np.pi
             
-        self.last_progress = current_progress
-
+        # Solo cuenta avance contra-reloj (delta_theta > 0)
+        delta_s = 5.0 * delta_theta   # arco = radio × ángulo
+        progress_reward = max(0.0, delta_s) * 10.0
+        
         terminated = False
         truncated = self.current_step >= self.max_steps
 
-        # 3. RECOMPENSA DE PROGRESO LONGITUDINAL (F1TENTH / AWS DeepRacer Pro)
-        # Recompensa por metros avanzados en el eje central
-        progress_reward = 10.0 * delta_progress
-        center_penalty = 0.3 * abs(dist_to_center)
-        step_penalty = -0.005  # Evita que se quede quieto a 0 m/s
+        reward = progress_reward - 0.3 * abs(dist_to_center) - 0.005
 
-        reward = progress_reward - center_penalty + step_penalty
+        # Detección de vuelta completa (cruzó de +π a -π yendo contra-reloj)
+        if delta_theta > 0 and abs(theta_t - self._theta_prev + 2*np.pi) < 0.1:
+            self._vueltas += 1
+            reward += 100.0
+            print(f"[VUELTA #{self._vueltas}] Completada en {self.current_step} steps")
 
-        # Bonus por completar una vuelta completa (no termina el episodio para permitir vueltas continuas)
-        if current_progress >= self.track.length - 0.5:
-            reward += 50.0
+        self._theta_prev = theta_t
 
-        # Choque o sentido contrario
+        # Choque o sentido contrario (ancho de carril 2m -> limite 0.85m del centro)
         if abs(dist_to_center) > 0.85:
             terminated = True
             reward = -10.0
@@ -263,7 +275,7 @@ class RacetrackEnv(gym.Env):
 
         info = {
             "dist_to_center": dist_to_center,
-            "delta_progress": delta_progress,
+            "delta_progress": delta_s,
             "speed": speed,
             "steer": steer
         }
