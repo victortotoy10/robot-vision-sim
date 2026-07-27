@@ -17,7 +17,7 @@ from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
 
 class ArtudoNeuralDriver(nn.Module):
-    def __init__(self, input_dim=10, output_dim=2):
+    def __init__(self, input_dim=8, output_dim=2):
         super(ArtudoNeuralDriver, self).__init__()
         self.net = nn.Sequential(
             nn.Linear(input_dim, 64),
@@ -43,7 +43,7 @@ class ARTUDONeuralPilot(Node):
             raise FileNotFoundError(f"Modelo no encontrado en {model_path}")
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model = ArtudoNeuralDriver(input_dim=10, output_dim=2).to(self.device)
+        self.model = ArtudoNeuralDriver(input_dim=8, output_dim=2).to(self.device)
         self.model.load_state_dict(torch.load(model_path, map_location=self.device))
         self.model.eval()
 
@@ -72,13 +72,9 @@ class ARTUDONeuralPilot(Node):
             obs.append(min(min_r, 10.0) / 10.0)
 
         lidar_sectors = np.array(obs, dtype=np.float32)
-        state_vec = np.concatenate([
-            lidar_sectors,
-            np.array([self.last_speed / 0.50, self.last_steer / 0.70], dtype=np.float32)
-        ])
 
         with torch.no_grad():
-            tensor_in = torch.tensor(state_vec, dtype=torch.float32).unsqueeze(0).to(self.device)
+            tensor_in = torch.tensor(lidar_sectors, dtype=torch.float32).unsqueeze(0).to(self.device)
             output = self.model(tensor_in).cpu().numpy()[0]
 
         steer = float(output[0])

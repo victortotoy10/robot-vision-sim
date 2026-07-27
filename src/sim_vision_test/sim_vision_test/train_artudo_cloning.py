@@ -14,7 +14,7 @@ import torch.optim as optim
 from torch.utils.data import TensorDataset, DataLoader
 
 class ArtudoNeuralDriver(nn.Module):
-    def __init__(self, input_dim=10, output_dim=2):
+    def __init__(self, input_dim=8, output_dim=2):
         super(ArtudoNeuralDriver, self).__init__()
         self.net = nn.Sequential(
             nn.Linear(input_dim, 64),
@@ -44,12 +44,16 @@ def main():
 
     print(f"Cargando dataset desde: {dataset_path}")
     data = np.load(dataset_path)
-    obs = data['obs']       # (N, 10)
-    actions = data['actions'] # (N, 2)
+    obs = data['obs']       # (N, 10) o (N, 8)
+    actions = data['actions'] # (N, 2) [steer, speed]
+
+    # Eliminar atajo de memoria: Aislar únicamente las 8 columnas del LiDAR
+    if obs.shape[1] > 8:
+        obs = obs[:, :8]
 
     print(f"Total de Muestras Experta Capturadas: {len(obs)}")
-    print(f"Formato de Observaciones           : {obs.shape}")
-    print(f"Formato de Acciones                : {actions.shape}")
+    print(f"Formato de Observaciones LiDAR (8 sectores): {obs.shape}")
+    print(f"Formato de Acciones [steer, speed]         : {actions.shape}")
     print("=" * 60)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
