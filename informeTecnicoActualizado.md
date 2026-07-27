@@ -26,6 +26,16 @@ Actualmente el proyecto cuenta con varios algoritmos disponibles en el repositor
 
 ---
 
+### 📷 ¿Se usa la Cámara o No? (Guía para Preguntas de Evaluación)
+
+* **Respuesta Directa:** **NO se utiliza la cámara para la navegación activa.** La conducción autónoma y el modelo de Red Neuronal operan al 100% mediante el **sensor LiDAR 2D (8 sectores de distancia)**.
+* **¿Para qué sirve la cámara entonces?** La cámara frontal del vehículo (`/camera/image_raw`) está montada y disponible únicamente para **monitoreo visual en tiempo real** (a través de `rqt_image_view` en la Terminal 2).
+* **Ventaja Técnica:** Al basar el cerebro de la IA en datos del LiDAR y no en píxeles de imagen:
+  1. **Velocidad Extrema:** La inferencia en la GPU Tesla T4 se realiza en **menos de 1 milisegundo** (< 0.001s por cuadro).
+  2. **Robustez:** La IA es 100% inmune a cambios de luz, sombras, reflejos o textura del asfalto.
+
+---
+
 ## 2. Mapa de Nodos del Paquete `sim_vision_test`
 
 | Nodo / Executable | Archivo de Origen | Descripción y Función |
