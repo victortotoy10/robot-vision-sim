@@ -26,7 +26,8 @@ class ArtudoNeuralDriver(nn.Module):
             nn.ReLU(),
             nn.Linear(64, 32),
             nn.ReLU(),
-            nn.Linear(32, output_dim)
+            nn.Linear(32, output_dim),
+            nn.Tanh()
         )
 
     def forward(self, x):
@@ -77,11 +78,13 @@ class ARTUDONeuralPilot(Node):
             tensor_in = torch.tensor(lidar_sectors, dtype=torch.float32).unsqueeze(0).to(self.device)
             output = self.model(tensor_in).cpu().numpy()[0]
 
-        steer = float(output[0])
-        speed = float(output[1])
+        # Des-normalizar salidas
+        steer = float(output[0]) * 0.70
+        speed = float(output[1]) * 0.50
 
+        # Garantizar marcha hacia adelante constante y límites físicos de giro
+        speed = max(min(speed, 0.50), 0.18)
         steer = max(min(steer, 0.70), -0.70)
-        speed = max(min(speed, 0.50), 0.0)
 
         self.last_steer = steer
         self.last_speed = speed

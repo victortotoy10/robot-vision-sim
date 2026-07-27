@@ -23,7 +23,8 @@ class ArtudoNeuralDriver(nn.Module):
             nn.ReLU(),
             nn.Linear(64, 32),
             nn.ReLU(),
-            nn.Linear(32, output_dim) # [steer, speed]
+            nn.Linear(32, output_dim),
+            nn.Tanh()
         )
 
     def forward(self, x):
@@ -51,6 +52,11 @@ def main():
     if obs.shape[1] > 8:
         obs = obs[:, :8]
 
+    # Normalizar acciones a [-1.0, 1.0] para entrenamiento suave con Tanh
+    actions_norm = np.copy(actions)
+    actions_norm[:, 0] = actions[:, 0] / 0.70  # steer normalizado
+    actions_norm[:, 1] = actions[:, 1] / 0.50  # speed normalizado
+
     print(f"Total de Muestras Experta Capturadas: {len(obs)}")
     print(f"Formato de Observaciones LiDAR (8 sectores): {obs.shape}")
     print(f"Formato de Acciones [steer, speed]         : {actions.shape}")
@@ -61,7 +67,7 @@ def main():
 
     # Convertir Tensors
     X = torch.tensor(obs, dtype=torch.float32)
-    Y = torch.tensor(actions, dtype=torch.float32)
+    Y = torch.tensor(actions_norm, dtype=torch.float32)
 
     # Split Train/Val (90% / 10%)
     dataset = TensorDataset(X, Y)
