@@ -101,50 +101,62 @@ Para el aprendizaje por refuerzo, se implementaron **5 correcciones de estabilid
 
 ---
 
-## 4. Guía Completa de Ejecución en AWS EC2 (Tesla T4)
+## 4. Guía Principal de Ejecución: Visualización 3D y Piloto Neuronal Autónomo
 
-Para poner en marcha la simulación y la grabación de 20 vueltas automáticas:
+Para visualizar el vehículo conduciendo de forma 100% autónoma guiado por la Red Neuronal Inteligente en un entorno **3D interactivo completo**:
 
-### 0️⃣ Paso 0: Limpieza, Pull y Compilación
+### 0️⃣ Paso 0: Sincronización y Compilación Inicial
 ```bash
-pkill -9 -f train_sb3; pkill -9 -f artudo; pkill -9 -f ros2; pkill -9 -f ign
+pkill -9 -f artudo; pkill -9 -f ros2; pkill -9 -f ign
 
 cd /home/ubuntu/robot-vision-sim
-git pull origin main
+git pull origin main --rebase
 source /opt/ros/humble/setup.bash
 colcon build --packages-select sim_vision_test
 source install/setup.bash
 ```
 
-### 1️⃣ Terminal 1: Lanzar Simulación (Pista Decorada 3D Completa)
+### 1️⃣ Terminal 1: Lanzar Simulación 3D Interactiva Completa (GUI 3D)
+Este comando abre la ventana gráfica 3D de Gazebo Sim (`headless:=false`) con la pista decorada completa en 3D (`racetrack_decorated`):
 ```bash
 cd /home/ubuntu/robot-vision-sim
 source /opt/ros/humble/setup.bash
 source install/setup.bash
-ros2 launch launch/robot_camera.launch.py world:=racetrack_decorated headless:=true
+
+ros2 launch launch/robot_camera.launch.py world:=racetrack_decorated headless:=false
 ```
 
-### 2️⃣ Terminal 2: Visualizador de Cámara (Opcional)
-```bash
-cd /home/ubuntu/robot-vision-sim
-source /opt/ros/humble/setup.bash
-ros2 run rqt_image_view rqt_image_view
-```
-*(Seleccionar `/camera/image_raw` arriba a la izquierda).*
-
-### 3️⃣ Terminal 3: Piloto Autónomo de `ar-tu-do-master`
+### 2️⃣ Terminal 3: Lanzar el Piloto Neuronal Autónomo (Inferencia por IA)
+Este comando ejecuta el modelo de Red Neuronal entrenado en la GPU Tesla T4, controlando el acelerador y el volante en tiempo real:
 ```bash
 cd /home/ubuntu/robot-vision-sim
 source /opt/ros/humble/setup.bash
 source install/setup.bash
-ros2 run sim_vision_test artudo_wall_follower
+
+ros2 run sim_vision_test artudo_neural_pilot
 ```
 
-### 4️⃣ Terminal 4: Grabador Automático de Telemetría
+---
+
+## 5. Guía Secundaria: Re-entrenamiento y Grabación de Telemetría
+
+### 🖥️ Entrenar la Red Neuronal en GPU (Terminal 4)
+Para procesar el dataset de 200+ vueltas grabadas y actualizar los pesos del modelo en menos de 30 segundos:
 ```bash
 cd /home/ubuntu/robot-vision-sim
 source /opt/ros/humble/setup.bash
 source install/setup.bash
+
+ros2 run sim_vision_test train_artudo_cloning
+```
+
+### 🎥 Grabar Nuevas Vueltas Automáticas (Opcional - Terminal 4)
+Si deseas generar un nuevo dataset automático con el piloto experto de `ar-tu-do-master`:
+```bash
+cd /home/ubuntu/robot-vision-sim
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+
 ros2 run sim_vision_test artudo_data_recorder
 ```
-*(Dejar correr hasta superar las 15,000 muestras / 20 vueltas y presionar `Ctrl+C` para guardar).*
+*(Presionar `Ctrl+C` tras completar las vueltas deseadas para guardar el dataset).*
