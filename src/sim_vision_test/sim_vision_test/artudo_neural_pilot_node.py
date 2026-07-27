@@ -86,6 +86,18 @@ class ARTUDONeuralPilot(Node):
         speed = max(min(speed, 0.50), 0.18)
         steer = max(min(steer, 0.70), -0.70)
 
+        # --- Red de seguridad anti-choque ---
+        # La red clonada nunca vio, durante el entrenamiento, estados de "casi
+        # tocando la pared" (el experto PID siempre corregía a tiempo), así que
+        # ante esos estados fuera de distribución puede sub-virar y empotrarse.
+        # sectores: 0..7 cubren -180..180°; el frente (0°) cae entre 3 (-45..0°) y 4 (0..45°).
+        front_dist = min(lidar_sectors[3], lidar_sectors[4]) * 10.0
+        if front_dist < 0.45:
+            left_space = lidar_sectors[5] + lidar_sectors[6]
+            right_space = lidar_sectors[1] + lidar_sectors[2]
+            steer = 0.70 if left_space > right_space else -0.70
+            speed = 0.18
+
         self.last_steer = steer
         self.last_speed = speed
 

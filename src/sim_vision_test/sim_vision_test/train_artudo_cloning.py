@@ -79,11 +79,20 @@ def main():
     val_loader = DataLoader(val_ds, batch_size=256, shuffle=False)
 
     model = ArtudoNeuralDriver(input_dim=obs.shape[1], output_dim=actions.shape[1]).to(device)
-    criterion = nn.MSELoss()
+    # reduction='none' para poder ponderar cada muestra por separado
+    criterion = nn.MSELoss(reduction='none')
     optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-5)
 
-    epochs = 40
-    print("\nIniciando entrenamiento por 40 épocas...")
+    def weighted_loss(outputs, targets):
+        # Las curvas cerradas (steer alto) son escasas frente a los tramos rectos.
+        # Sin ponderar, el MSE "promedia" el giro y la red sub-vira en curvas,
+        # provocando choques. Se pondera cada muestra según |steer| objetivo.
+        per_sample = criterion(outputs, targets)              # (batch, 2)
+        steer_weight = 1.0 + 4.0 * torch.abs(targets[:, 0])    # 1x recto .. 5x giro máximo
+        return (per_sample * steer_weight.unsqueeze(1)).mean()
+
+    epochs = 60
+    print("\nIniciando entrenamiento por 60 épocas (con pérdida ponderada por giro)...")
     print("-" * 60)
 
     for epoch in range(1, epochs + 1):
@@ -93,7 +102,7 @@ def main():
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
             optimizer.zero_grad()
             outputs = model(batch_x)
-            loss = criterion(outputs, batch_y)
+            loss = weighted_loss(outputs, batch_y)
             loss.backward()
             optimizer.step()
             train_loss += loss.item() * batch_x.size(0)
@@ -106,7 +115,7 @@ def main():
             for batch_x, batch_y in val_loader:
                 batch_x, batch_y = batch_x.to(device), batch_y.to(device)
                 outputs = model(batch_x)
-                loss = criterion(outputs, batch_y)
+                loss = weighted_loss(outputs, batch_y)
                 val_loss += loss.item() * batch_x.size(0)
         val_loss /= val_size
 
