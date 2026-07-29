@@ -21,11 +21,10 @@ class VisionSimNode(Node):
         self.bridge = CvBridge()
 
         # HSV (opcional)
-        self.declare_parameter('hsv_lower', [0, 0, 180])
-        self.declare_parameter('hsv_upper', [180, 60, 255])
-        self.declare_parameter('use_hsv', False)
-        # Umbral de brillo para detectar las lineas blancas
-        self.declare_parameter('brightness_threshold', 160)
+        self.declare_parameter('hsv_lower', [0, 0, 150])
+        self.declare_parameter('hsv_upper', [180, 80, 255])
+        self.declare_parameter('use_hsv', True)
+        self.declare_parameter('brightness_threshold', 130)
 
         self.declare_parameter('show_image', False)
         self.declare_parameter('follow_line', False)
