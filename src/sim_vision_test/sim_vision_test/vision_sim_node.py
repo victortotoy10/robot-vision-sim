@@ -17,6 +17,7 @@ class VisionSimNode(Node):
             Image, '/camera/image_raw', self.image_callback, 10)
 
         self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.image_pub = self.create_publisher(Image, '/camera/image_processed', 10)
         self.bridge = CvBridge()
 
         # HSV (opcional)
@@ -162,19 +163,18 @@ class VisionSimNode(Node):
             else:
                 print(f"FPS:{self.fps_rolling:4.1f} | {st} | cx={cx:3d} err={error:+4d}px | AUTONOMO: INACTIVO", flush=True)
 
-            # Debug visual
+            # Publicar siempre la imagen procesada binaria (B&W) en /camera/image_processed para rqt_image_view
+            mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+            if line_detected:
+                cv2.circle(mask_bgr, (cx, rh // 2), 6, (255, 0, 0), -1) # Centroide Azul
+                cv2.line(mask_bgr, (rw // 2, 0), (rw // 2, rh), (0, 255, 0), 2) # Eje central verde
+                cv2.arrowedLine(mask_bgr, (rw // 2, rh // 2), (cx, rh // 2), (0, 255, 255), 2)
+
+            proc_msg = self.bridge.cv2_to_imgmsg(mask_bgr, encoding='bgr8')
+            self.image_pub.publish(proc_msg)
+
+            # Debug visual local si DISPLAY existe
             if self.get_parameter('show_image').value and 'DISPLAY' in os.environ:
-                dbg = roi.copy()
-                overlay = np.zeros_like(roi)
-                overlay[mask > 0] = (0, 220, 0)
-                dbg = cv2.addWeighted(dbg, 0.7, overlay, 0.3, 0)
-                if line_detected:
-                    cv2.circle(dbg, (cx, rh // 2), 8, (0, 0, 255), -1)
-                cv2.line(dbg, (rw // 2, 0), (rw // 2, rh), (255, 0, 0), 2)
-                cv2.arrowedLine(dbg, (rw // 2, rh // 2), (cx, rh // 2), (0, 255, 255), 2)
-                color = (0, 200, 0) if line_detected else (0, 0, 255)
-                cv2.putText(dbg, st, (5, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
-                cv2.imshow("ROI original", dbg)
                 cv2.imshow("Mascara deteccion", mask)
                 cv2.waitKey(1)
 
