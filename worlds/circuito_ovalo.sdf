@@ -1,0 +1,2065 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <world name="circuito_ovalo">
+
+    <!-- ================= PARÁMETROS DEL CIRCUITO (para referencia) =================
+         Longitud de recta : 6.0 m
+         Radio de curva    : 3.0 m
+         Ancho de carril    : 1.0 m
+         Ancho de línea     : 0.05 m
+         =============================================================================== -->
+
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"></plugin>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"></plugin>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"></plugin>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.4 0.2 -0.9</direction>
+    </light>
+
+    <!-- Piso negro, sin textura -->
+    <model name="piso">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>20.0 20.0</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>0.9</mu>
+                <mu2>0.9</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>20.0 20.0</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0 0 0 1</ambient>
+            <diffuse>0 0 0 1</diffuse>
+            <specular>0 0 0 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Líneas blancas del carril (óvalo de un solo carril) -->
+    <model name="lineas_carril">
+      <static>true</static>
+      <link name="recta_sup_int">
+        <pose>0.0000 2.5000 0.0010 0 0 0.000000</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>6.0000 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="recta_sup_ext">
+        <pose>0.0000 3.5000 0.0010 0 0 0.000000</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>6.0000 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="recta_inf_int">
+        <pose>0.0000 -2.5000 0.0010 0 0 0.000000</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>6.0000 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="recta_inf_ext">
+        <pose>0.0000 -3.5000 0.0010 0 0 0.000000</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>6.0000 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_0">
+        <pose>3.1308 -2.4966 0.0010 0 0 0.052360</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_1">
+        <pose>3.3911 -2.4692 0.0010 0 0 0.157080</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_2">
+        <pose>3.6470 -2.4148 0.0010 0 0 0.261799</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_3">
+        <pose>3.8959 -2.3340 0.0010 0 0 0.366519</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_4">
+        <pose>4.1350 -2.2275 0.0010 0 0 0.471239</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_5">
+        <pose>4.3616 -2.0967 0.0010 0 0 0.575959</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_6">
+        <pose>4.5733 -1.9429 0.0010 0 0 0.680678</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_7">
+        <pose>4.7678 -1.7678 0.0010 0 0 0.785398</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_8">
+        <pose>4.9429 -1.5733 0.0010 0 0 0.890118</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_9">
+        <pose>5.0967 -1.3616 0.0010 0 0 0.994838</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_10">
+        <pose>5.2275 -1.1350 0.0010 0 0 1.099557</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_11">
+        <pose>5.3340 -0.8959 0.0010 0 0 1.204277</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_12">
+        <pose>5.4148 -0.6470 0.0010 0 0 1.308997</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_13">
+        <pose>5.4692 -0.3911 0.0010 0 0 1.413717</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_14">
+        <pose>5.4966 -0.1308 0.0010 0 0 1.518436</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_15">
+        <pose>5.4966 0.1308 0.0010 0 0 1.623156</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_16">
+        <pose>5.4692 0.3911 0.0010 0 0 1.727876</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_17">
+        <pose>5.4148 0.6470 0.0010 0 0 1.832596</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_18">
+        <pose>5.3340 0.8959 0.0010 0 0 1.937315</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_19">
+        <pose>5.2275 1.1350 0.0010 0 0 2.042035</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_20">
+        <pose>5.0967 1.3616 0.0010 0 0 2.146755</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_21">
+        <pose>4.9429 1.5733 0.0010 0 0 2.251475</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_22">
+        <pose>4.7678 1.7678 0.0010 0 0 2.356194</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_23">
+        <pose>4.5733 1.9429 0.0010 0 0 2.460914</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_24">
+        <pose>4.3616 2.0967 0.0010 0 0 2.565634</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_25">
+        <pose>4.1350 2.2275 0.0010 0 0 2.670354</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_26">
+        <pose>3.8959 2.3340 0.0010 0 0 2.775074</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_27">
+        <pose>3.6470 2.4148 0.0010 0 0 2.879793</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_28">
+        <pose>3.3911 2.4692 0.0010 0 0 2.984513</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_int_29">
+        <pose>3.1308 2.4966 0.0010 0 0 3.089233</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_0">
+        <pose>3.1832 -3.4952 0.0010 0 0 0.052360</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_1">
+        <pose>3.5475 -3.4569 0.0010 0 0 0.157080</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_2">
+        <pose>3.9059 -3.3807 0.0010 0 0 0.261799</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_3">
+        <pose>4.2543 -3.2675 0.0010 0 0 0.366519</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_4">
+        <pose>4.5890 -3.1185 0.0010 0 0 0.471239</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_5">
+        <pose>4.9062 -2.9353 0.0010 0 0 0.575959</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_6">
+        <pose>5.2026 -2.7200 0.0010 0 0 0.680678</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_7">
+        <pose>5.4749 -2.4749 0.0010 0 0 0.785398</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_8">
+        <pose>5.7200 -2.2026 0.0010 0 0 0.890118</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_9">
+        <pose>5.9353 -1.9062 0.0010 0 0 0.994838</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_10">
+        <pose>6.1185 -1.5890 0.0010 0 0 1.099557</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_11">
+        <pose>6.2675 -1.2543 0.0010 0 0 1.204277</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_12">
+        <pose>6.3807 -0.9059 0.0010 0 0 1.308997</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_13">
+        <pose>6.4569 -0.5475 0.0010 0 0 1.413717</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_14">
+        <pose>6.4952 -0.1832 0.0010 0 0 1.518436</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_15">
+        <pose>6.4952 0.1832 0.0010 0 0 1.623156</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_16">
+        <pose>6.4569 0.5475 0.0010 0 0 1.727876</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_17">
+        <pose>6.3807 0.9059 0.0010 0 0 1.832596</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_18">
+        <pose>6.2675 1.2543 0.0010 0 0 1.937315</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_19">
+        <pose>6.1185 1.5890 0.0010 0 0 2.042035</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_20">
+        <pose>5.9353 1.9062 0.0010 0 0 2.146755</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_21">
+        <pose>5.7200 2.2026 0.0010 0 0 2.251475</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_22">
+        <pose>5.4749 2.4749 0.0010 0 0 2.356194</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_23">
+        <pose>5.2026 2.7200 0.0010 0 0 2.460914</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_24">
+        <pose>4.9062 2.9353 0.0010 0 0 2.565634</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_25">
+        <pose>4.5890 3.1185 0.0010 0 0 2.670354</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_26">
+        <pose>4.2543 3.2675 0.0010 0 0 2.775074</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_27">
+        <pose>3.9059 3.3807 0.0010 0 0 2.879793</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_28">
+        <pose>3.5475 3.4569 0.0010 0 0 2.984513</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_der_ext_29">
+        <pose>3.1832 3.4952 0.0010 0 0 3.089233</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_0">
+        <pose>-3.1308 2.4966 0.0010 0 0 3.193953</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_1">
+        <pose>-3.3911 2.4692 0.0010 0 0 3.298672</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_2">
+        <pose>-3.6470 2.4148 0.0010 0 0 3.403392</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_3">
+        <pose>-3.8959 2.3340 0.0010 0 0 3.508112</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_4">
+        <pose>-4.1350 2.2275 0.0010 0 0 3.612832</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_5">
+        <pose>-4.3616 2.0967 0.0010 0 0 3.717551</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_6">
+        <pose>-4.5733 1.9429 0.0010 0 0 3.822271</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_7">
+        <pose>-4.7678 1.7678 0.0010 0 0 3.926991</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_8">
+        <pose>-4.9429 1.5733 0.0010 0 0 4.031711</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_9">
+        <pose>-5.0967 1.3616 0.0010 0 0 4.136430</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_10">
+        <pose>-5.2275 1.1350 0.0010 0 0 4.241150</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_11">
+        <pose>-5.3340 0.8959 0.0010 0 0 4.345870</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_12">
+        <pose>-5.4148 0.6470 0.0010 0 0 4.450590</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_13">
+        <pose>-5.4692 0.3911 0.0010 0 0 4.555309</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_14">
+        <pose>-5.4966 0.1308 0.0010 0 0 4.660029</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_15">
+        <pose>-5.4966 -0.1308 0.0010 0 0 4.764749</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_16">
+        <pose>-5.4692 -0.3911 0.0010 0 0 4.869469</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_17">
+        <pose>-5.4148 -0.6470 0.0010 0 0 4.974188</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_18">
+        <pose>-5.3340 -0.8959 0.0010 0 0 5.078908</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_19">
+        <pose>-5.2275 -1.1350 0.0010 0 0 5.183628</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_20">
+        <pose>-5.0967 -1.3616 0.0010 0 0 5.288348</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_21">
+        <pose>-4.9429 -1.5733 0.0010 0 0 5.393067</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_22">
+        <pose>-4.7678 -1.7678 0.0010 0 0 5.497787</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_23">
+        <pose>-4.5733 -1.9429 0.0010 0 0 5.602507</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_24">
+        <pose>-4.3616 -2.0967 0.0010 0 0 5.707227</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_25">
+        <pose>-4.1350 -2.2275 0.0010 0 0 5.811946</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_26">
+        <pose>-3.8959 -2.3340 0.0010 0 0 5.916666</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_27">
+        <pose>-3.6470 -2.4148 0.0010 0 0 6.021386</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_28">
+        <pose>-3.3911 -2.4692 0.0010 0 0 6.126106</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_int_29">
+        <pose>-3.1308 -2.4966 0.0010 0 0 6.230825</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.3009 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_0">
+        <pose>-3.1832 3.4952 0.0010 0 0 3.193953</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_1">
+        <pose>-3.5475 3.4569 0.0010 0 0 3.298672</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_2">
+        <pose>-3.9059 3.3807 0.0010 0 0 3.403392</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_3">
+        <pose>-4.2543 3.2675 0.0010 0 0 3.508112</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_4">
+        <pose>-4.5890 3.1185 0.0010 0 0 3.612832</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_5">
+        <pose>-4.9062 2.9353 0.0010 0 0 3.717551</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_6">
+        <pose>-5.2026 2.7200 0.0010 0 0 3.822271</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_7">
+        <pose>-5.4749 2.4749 0.0010 0 0 3.926991</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_8">
+        <pose>-5.7200 2.2026 0.0010 0 0 4.031711</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_9">
+        <pose>-5.9353 1.9062 0.0010 0 0 4.136430</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_10">
+        <pose>-6.1185 1.5890 0.0010 0 0 4.241150</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_11">
+        <pose>-6.2675 1.2543 0.0010 0 0 4.345870</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_12">
+        <pose>-6.3807 0.9059 0.0010 0 0 4.450590</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_13">
+        <pose>-6.4569 0.5475 0.0010 0 0 4.555309</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_14">
+        <pose>-6.4952 0.1832 0.0010 0 0 4.660029</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_15">
+        <pose>-6.4952 -0.1832 0.0010 0 0 4.764749</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_16">
+        <pose>-6.4569 -0.5475 0.0010 0 0 4.869469</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_17">
+        <pose>-6.3807 -0.9059 0.0010 0 0 4.974188</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_18">
+        <pose>-6.2675 -1.2543 0.0010 0 0 5.078908</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_19">
+        <pose>-6.1185 -1.5890 0.0010 0 0 5.183628</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_20">
+        <pose>-5.9353 -1.9062 0.0010 0 0 5.288348</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_21">
+        <pose>-5.7200 -2.2026 0.0010 0 0 5.393067</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_22">
+        <pose>-5.4749 -2.4749 0.0010 0 0 5.497787</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_23">
+        <pose>-5.2026 -2.7200 0.0010 0 0 5.602507</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_24">
+        <pose>-4.9062 -2.9353 0.0010 0 0 5.707227</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_25">
+        <pose>-4.5890 -3.1185 0.0010 0 0 5.811946</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_26">
+        <pose>-4.2543 -3.2675 0.0010 0 0 5.916666</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_27">
+        <pose>-3.9059 -3.3807 0.0010 0 0 6.021386</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_28">
+        <pose>-3.5475 -3.4569 0.0010 0 0 6.126106</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+      <link name="curva_izq_ext_29">
+        <pose>-3.1832 -3.4952 0.0010 0 0 6.230825</pose>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.4213 0.0500 0.0020</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <emissive>0 0 0 1</emissive>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>
