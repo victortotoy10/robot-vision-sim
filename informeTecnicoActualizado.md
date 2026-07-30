@@ -20,7 +20,7 @@ graph TD
 
     subgraph Cerebro ["2. Inferencia Neuronal (PyTorch CUDA T4)"]
         STATE --> MLP["Red Neuronal MLP (Tanh Bounded)"]
-        MLP -->|Mapeo Estado-Acción pi(St)| ACTION["Comandos Normalizados Y_t"]
+        MLP -->|"Mapeo Estado-Acción pi(S_t)"| ACTION["Comandos Normalizados Y_t"]
     end
 
     subgraph Actuacion ["3. Control y Dinámica del Vehículo"]
