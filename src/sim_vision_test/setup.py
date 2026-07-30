@@ -28,6 +28,7 @@ setup(
             'artudo_data_recorder = sim_vision_test.artudo_data_recorder_node:main',
             'train_artudo_cloning = sim_vision_test.train_artudo_cloning:main',
             'artudo_neural_pilot = sim_vision_test.artudo_neural_pilot_node:main',
+            'train_cnn = sim_vision_test.train_cnn:train',
             'train_sb3 = sim_vision_test.train_sb3:main',
             'sb3_pilot = sim_vision_test.sb3_pilot:main'
         ],
