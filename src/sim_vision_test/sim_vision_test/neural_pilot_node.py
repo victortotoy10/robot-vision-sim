@@ -86,9 +86,10 @@ class NeuralPilotNode(Node):
                 prediction = self.model(img_tensor)
                 outputs = prediction.cpu().numpy()[0]
 
-            # Desnormalizar predicciones
-            raw_linear = float(outputs[0]) * 0.50
-            raw_angular = float(outputs[1]) * 0.70
+            # Desnormalizar predicciones (debe coincidir con la normalizacion de train_cnn.py:
+            # linear_x_norm = linear_x / 2.0, angular_z_norm = angular_z / 3.0)
+            raw_linear = float(outputs[0]) * 2.0
+            raw_angular = float(outputs[1]) * 3.0
 
             # Parametros
             base_speed = self.get_parameter('base_speed').value

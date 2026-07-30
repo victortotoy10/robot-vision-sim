@@ -503,8 +503,8 @@ class NeuralPilotNode(Node):
                 prediction = self.model(img_tensor)
                 outputs = prediction.cpu().numpy()[0]
 
-            raw_linear = float(outputs[0]) * 0.50
-            raw_angular = float(outputs[1]) * 0.70
+            raw_linear = float(outputs[0]) * 2.0
+            raw_angular = float(outputs[1]) * 3.0
 
             base_speed = self.get_parameter('base_speed').value
             max_ang = self.get_parameter('max_angular_speed').value
@@ -559,6 +559,8 @@ if __name__ == '__main__':
 9. **Sistema híbrido de velocidad (líneas 90-99):** La **dirección** (`angular_z`) sale directamente de lo que predijo la red, solo acotada a un rango físico seguro (`np.clip`). La **velocidad**, en cambio, combina la predicción de la IA con una regla de seguridad explícita: si la red predice un valor de avance por debajo de `reverse_threshold`, se interpreta como intención de retroceder y se acota a un rango de reversa controlado; si no, la velocidad de avance se reduce proporcionalmente según qué tan cerrado sea el giro (`turn_ratio`) — frenando en curvas cerradas y acelerando en tramos rectos. Esta combinación evita que un error puntual de la red en la componente de velocidad (más difícil de predecir con precisión que la dirección) haga que el auto acelere de forma imprudente en una curva.
 10. **Publicación del comando (líneas 101-104):** El resultado final se empaqueta en un mensaje `Twist` y se publica en `/cmd_vel` — el mismo tópico que efectivamente mueve las ruedas del auto en la simulación.
 11. **Manejo de excepciones (líneas 106-107 y 119-124):** Cualquier error durante el procesamiento de un frame individual se captura y se registra como log, sin tumbar el nodo completo — así un frame corrupto puntual no interrumpe la conducción. `FileNotFoundError` se captura por separado en `main()` para dar un cierre ordenado si el modelo nunca se encontró al arrancar.
+
+> **📝 Nota de depuración (errata corregida):** una versión anterior de este nodo desnormalizaba multiplicando por `0.50` y `0.70` (los límites físicos del auto) en vez de por `2.0` y `3.0` (el inverso exacto de la normalización de la Sección 2.7). Ese desajuste reducía el giro real enviado al auto a solo ~23% de lo que la red predecía internamente, causando que el auto no tomara bien las curvas y, al salirse ligeramente del trazado hacia imágenes fuera de la distribución de entrenamiento, la predicción de velocidad se volviera errática y activara reversa de forma espuria. Las constantes ya están corregidas en el código de arriba.
 
 ---
 
