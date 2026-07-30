@@ -518,6 +518,42 @@ source install/setup.bash
 
 ros2 run sim_vision_test artudo_neural_pilot
 ```
+🔑 **Esta es la única terminal que hace cálculos "del carro" (del control).** Es la que lee el LiDAR, decide cuánto girar y acelerar, y publica esa orden en el tópico `/cmd_vel` (ver [glosario](#6-glosario-de-términos-técnicos-para-entender-sin-tecnicismos)), que es el canal que realmente mueve las ruedas. Si esta terminal se cierra, el auto se detiene.
+
+### 4️⃣ Terminal 4 (opcional): Nodo de Visión por Cámara — solo diagnóstico
+```bash
+cd /home/ubuntu/robot-vision-sim
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+
+ros2 run sim_vision_test vision_sim_node
+```
+🔎 **Esta terminal hace cálculos "de la cámara", no "del carro".** Corre en paralelo al piloto LiDAR y en la consola vas a ver una línea por cada imagen procesada, por ejemplo:
+```
+FPS:20.9 | LINEA OK | cx=193 err=+33px | AUTONOMO: INACTIVO
+```
+Eso es este nodo detectando dónde está la línea del piso *dentro de la imagen de la cámara* (no dentro del mundo real) y calculando qué tan lejos está del centro. **"AUTONOMO: INACTIVO" es intencional**: por defecto este nodo NO tiene permiso de mover el auto (el parámetro `follow_line` viene en `false`), así que esos cálculos se imprimen en pantalla pero **no llegan a `/cmd_vel` y no influyen en absoluto en que el auto se mantenga o no dentro del camino** — eso lo sigue haciendo 100% la Terminal 3 con el LiDAR. Esta terminal existe para que puedas comparar, con fines académicos, qué "vería" un enfoque basado en cámara frente al enfoque basado en LiDAR que realmente conduce.
+
+### 5️⃣ Terminal 5 (opcional): Visor de la Cámara Procesada en Blanco y Negro
+```bash
+cd /home/ubuntu/robot-vision-sim
+source /opt/ros/humble/setup.bash
+
+ros2 run rqt_image_view rqt_image_view
+```
+*(Seleccionar el tópico `/camera/image_processed` en el desplegable superior de la ventana).*
+
+Esta terminal no calcula nada por sí sola: solo **dibuja en pantalla** el resultado que la Terminal 4 ya calculó y publicó. Vas a ver la imagen convertida a blanco y negro (máscara binaria) con tres marcas de color superpuestas para entender el cálculo de un vistazo: un punto azul (el centroide, es decir, el centro de la línea detectada), una línea verde vertical (el centro exacto de la imagen, la referencia "ir derecho") y una flecha amarilla (hacia qué lado y cuánto habría que corregir). Cuanto más separados estén el punto azul y la línea verde, mayor es el `error` en píxeles que ves en la Terminal 4.
+
+**Resumen de quién hace qué:**
+
+| Terminal | Sensor que usa | ¿Calcula algo? | ¿Mueve el auto? |
+|---|---|---|---|
+| 1️⃣ Simulación 3D | — | Física y renderizado del mundo | No decide, solo simula |
+| 2️⃣ Visor cámara color | Cámara | No, solo muestra | No |
+| 3️⃣ Piloto Neuronal | LiDAR | Sí — la Red Neuronal decide dirección/velocidad | **Sí, es el único que conduce** |
+| 4️⃣ Nodo de visión | Cámara | Sí — detecta la línea y calcula el error en píxeles | No (desactivado a propósito) |
+| 5️⃣ Visor cámara B/N | Cámara (vía Terminal 4) | No, solo muestra | No |
 
 ---
 
@@ -529,3 +565,37 @@ Un sistema ciego (*Open-Loop*) reproduciría una lista fija de tiempos. Nuestro 
 
 ### ❓ Pregunta 2: ¿Se usa la Cámara o el LiDAR para el Entrenamiento?
 La conducción autónoma de alta velocidad opera mediante el **sensor LiDAR 2D (8 sectores de distancia)** por su inmunidad a sombras y velocidad de inferencia ($< 0.5\text{ms}$). La cámara frontal FPV se utiliza para el streaming y monitoreo visual en tiempo real a través de `rqt_image_view`.
+
+### ❓ Pregunta 3: Cuando abro el nodo de cámara y veo "cx=193 err=+33px", ¿esos cálculos ayudan a que el auto no se salga del camino?
+**RESPUESTA: NO, esos cálculos son solo un diagnóstico visual paralelo, desconectado del control real del auto.**
+Hay dos fuentes de cálculo completamente independientes en este proyecto y es fácil confundirlas porque corren al mismo tiempo:
+- **Los cálculos "del carro"** (los que sí evitan que se salga del camino) los hace únicamente el **Piloto Neuronal** (Terminal 3, `artudo_neural_pilot`), usando el LiDAR. Es el único nodo que publica en el tópico `/cmd_vel`, el canal que mueve las ruedas.
+- **Los cálculos "de la cámara"** (`cx`, `err`, FPS que ves en la Terminal 4) los hace el nodo `vision_sim_node` analizando la imagen. Por diseño, este nodo tiene el "freno de mano" puesto (parámetro `follow_line=false` por defecto): calcula dónde estaría la línea, pero nunca envía esa orden al auto. Es una demostración de "así vería el camino un sistema basado en cámara", útil para comparar con el enfoque LiDAR, pero no forma parte del lazo de control activo.
+
+En otras palabras: si cerrás la Terminal 4, el auto sigue manejando exactamente igual, porque quien lo maneja es la Terminal 3.
+
+---
+
+## 6. Glosario de Términos Técnicos (Para Entender Sin Tecnicismos)
+
+| Término | Qué significa en criollo |
+|---|---|
+| **Nodo** | Un programa independiente que se enciende con `ros2 run ...`. Cada terminal que abrís en la Sección 4 enciende un nodo distinto; todos corren al mismo tiempo pero por separado. |
+| **Tópico (topic)** | Un canal de comunicación con nombre (ej. `/scan`, `/cmd_vel`, `/camera/image_raw`) por el que los nodos se pasan datos. Un nodo "publica" (envía) y otro se "suscribe" (escucha). Los nodos nunca se hablan directamente, siempre a través de un tópico. |
+| **`/cmd_vel`** | El tópico que de verdad mueve las ruedas del auto (velocidad de avance + giro). Solo importa quién publica ahí; todo lo demás es solo información. |
+| **`Twist`** | El tipo de mensaje que viaja por `/cmd_vel`: trae "cuánto avanzar" (`linear.x`) y "cuánto girar" (`angular.z`). |
+| **LiDAR** | Sensor que lanza pulsos de láser en abanico y mide cuánto tardan en rebotar, dando la distancia exacta (en metros) a los obstáculos en varios ángulos. Es el sensor que efectivamente evita los choques en este proyecto. |
+| **Cámara / imagen RGB** | Sensor de color, igual que una cámara de celular. Por sí sola no mide distancia; para "entender" el camino hay que procesarla con visión por computadora (como hace `vision_sim_node`). |
+| **HSV** | Otra forma de describir el color de cada píxel (Matiz, Saturación, Valor) en vez de Rojo-Verde-Azul. Se usa porque separa el color puro del brillo, lo que facilita distinguir, por ejemplo, una línea clara del asfalto oscuro aunque cambie la luz. |
+| **Máscara binaria** | El resultado de procesar la imagen: cada píxel queda blanco ("esto es línea") o negro ("esto no es línea"). Es lo que se ve en `/camera/image_processed`. |
+| **ROI (Región de Interés)** | El recorte de la imagen que realmente se analiza — acá, la mitad inferior, porque ahí suele estar el piso y no el cielo. |
+| **Centroide** | El punto promedio de todos los píxeles blancos de la máscara; en criollo, "el centro de la línea detectada". Se marca con el punto azul en la Terminal 5. |
+| **`cx` / `error`** | `cx` es la posición horizontal del centroide en píxeles. `error` es la distancia entre `cx` y el centro de la imagen: 0 = auto centrado, positivo = línea a la derecha, negativo = línea a la izquierda. |
+| **FPS** | Cuadros (imágenes) por segundo que procesa un nodo de visión. Mide qué tan rápido reacciona ese cálculo, no qué tan rápido va el auto. |
+| **PID** | Fórmula clásica de control: decide cuánto corregir sumando tres partes: el error de ahora (Proporcional), la acumulación de errores pasados (Integral) y qué tan rápido está cambiando el error (Derivativo). Es el método que usaría `vision_sim_node` para manejar si se activara. |
+| **Inferencia** | El momento en que una red neuronal ya entrenada recibe un dato nuevo (ej. la lectura actual del LiDAR) y calcula una salida (dirección/velocidad), sin aprender nada nuevo en ese instante — solo "aplica lo aprendido". |
+| **CUDA / GPU** | La GPU es la tarjeta gráfica; CUDA es la tecnología de NVIDIA que le permite a PyTorch usarla para hacer muchísimas cuentas en paralelo, mucho más rápido que el procesador normal (CPU). Por eso el entrenamiento tarda segundos y no minutos. |
+| **`headless`** | Modo sin ventana gráfica. `headless:=false` (Terminal 1) abre la ventana 3D de Gazebo para que la veas; `headless:=true` la simulación corre "a ciegas" en el servidor, más rápido, sin gastar recursos dibujando. |
+| **Bucle cerrado (closed-loop)** | Un sistema que después de cada acción vuelve a medir el mundo real con un sensor y ajusta la próxima decisión según lo que midió. Lo opuesto es bucle abierto (open-loop): repetir una lista fija de movimientos sin mirar qué pasó realmente. |
+| **Dataset** | La colección de ejemplos grabados (lectura del sensor + maniobra correcta que hizo el piloto experto) que se usa para entrenar la red neuronal. |
+| **Loss (pérdida)** | Un número que mide qué tan mal predice la red neuronal comparado con los ejemplos reales del dataset. Entrenar es, básicamente, ir bajando ese número lo más posible. |
