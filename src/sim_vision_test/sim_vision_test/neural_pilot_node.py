@@ -50,8 +50,11 @@ class NeuralPilotNode(Node):
         self.declare_parameter('base_speed', 0.50)
         self.declare_parameter('max_angular_speed', 0.70)
         self.declare_parameter('reverse_threshold', -0.15)
-        # Peso del giro anterior en el suavizado exponencial (0 = sin suavizado, mas cerca de 1 = mas suave/lento)
-        self.declare_parameter('steer_smoothing', 0.6)
+        # Peso del giro anterior en el suavizado exponencial (0 = sin suavizado, mas cerca de 1 = mas suave/lento).
+        # Default en 0.0 (desactivado): en pruebas reales, valores altos introdujeron
+        # demasiado retraso y el auto chocaba mas seguido. Ajustar con --ros-args -p
+        # steer_smoothing:=X solo si hay tiempo para afinarlo con calma.
+        self.declare_parameter('steer_smoothing', 0.0)
 
         # Estado del giro suavizado entre frames (evita volantazos bruscos frame a frame)
         self.prev_angular_z = 0.0
