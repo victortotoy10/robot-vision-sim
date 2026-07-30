@@ -472,6 +472,11 @@ class NeuralPilotNode(Node):
         self.declare_parameter('base_speed', 0.50)
         self.declare_parameter('max_angular_speed', 0.70)
         self.declare_parameter('reverse_threshold', -0.15)
+        # Peso del giro anterior en el suavizado exponencial (0 = sin suavizado)
+        self.declare_parameter('steer_smoothing', 0.0)
+
+        # Estado del giro suavizado entre frames
+        self.prev_angular_z = 0.0
 
         model_path = os.path.expanduser('~/training_data/racer_model.pth')
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -509,9 +514,14 @@ class NeuralPilotNode(Node):
             base_speed = self.get_parameter('base_speed').value
             max_ang = self.get_parameter('max_angular_speed').value
             rev_thr = self.get_parameter('reverse_threshold').value
+            smoothing = self.get_parameter('steer_smoothing').value
 
             # --- SISTEMA HIBRIDO: IA DIRIGE, REGLA CONTROLA VELOCIDAD ---
-            angular_z = float(np.clip(raw_angular, -max_ang, max_ang))
+            angular_z_instant = float(np.clip(raw_angular, -max_ang, max_ang))
+
+            # Suavizado exponencial (EMA) opcional entre frames
+            angular_z = smoothing * self.prev_angular_z + (1.0 - smoothing) * angular_z_instant
+            self.prev_angular_z = angular_z
 
             if raw_linear < rev_thr:
                 linear_x = float(np.clip(raw_linear, -0.4, -0.1))
@@ -556,11 +566,16 @@ if __name__ == '__main__':
 6. **`unsqueeze(0)` (línea 76):** Las redes de PyTorch esperan siempre un **lote** de imágenes, aunque sea de tamaño 1 (dimensión: `batch, canal, alto, ancho`). `unsqueeze(0)` agrega esa dimensión de lote faltante a la imagen individual.
 7. **Inferencia (líneas 79-81):** `with torch.no_grad()` desactiva el cálculo de gradientes (no hace falta durante el manejo, solo durante el entrenamiento) — esto acelera la predicción y reduce el uso de memoria. Un solo `forward pass` de la red entrenada convierte la imagen directamente en las 2 salidas numéricas.
 8. **Des-normalización (líneas 83-84):** Revierte exactamente la normalización de la Sección 2.7, multiplicando por las mismas constantes de escala, para volver a obtener valores en unidades físicas reales ($\text{m/s}$ y $\text{rad/s}$).
-9. **Sistema híbrido de velocidad (líneas 90-99):** La **dirección** (`angular_z`) sale directamente de lo que predijo la red, solo acotada a un rango físico seguro (`np.clip`). La **velocidad**, en cambio, combina la predicción de la IA con una regla de seguridad explícita: si la red predice un valor de avance por debajo de `reverse_threshold`, se interpreta como intención de retroceder y se acota a un rango de reversa controlado; si no, la velocidad de avance se reduce proporcionalmente según qué tan cerrado sea el giro (`turn_ratio`) — frenando en curvas cerradas y acelerando en tramos rectos. Esta combinación evita que un error puntual de la red en la componente de velocidad (más difícil de predecir con precisión que la dirección) haga que el auto acelere de forma imprudente en una curva.
-10. **Publicación del comando (líneas 101-104):** El resultado final se empaqueta en un mensaje `Twist` y se publica en `/cmd_vel` — el mismo tópico que efectivamente mueve las ruedas del auto en la simulación.
-11. **Manejo de excepciones (líneas 106-107 y 119-124):** Cualquier error durante el procesamiento de un frame individual se captura y se registra como log, sin tumbar el nodo completo — así un frame corrupto puntual no interrumpe la conducción. `FileNotFoundError` se captura por separado en `main()` para dar un cierre ordenado si el modelo nunca se encontró al arrancar.
+9. **Suavizado exponencial del giro (`steer_smoothing`):** cada frame se predice de forma independiente, sin ninguna memoria del anterior — así que un frame puntualmente ruidoso puede producir un giro exagerado de un instante a otro. `angular_z_instant` es el giro que la red pide *ahora mismo*; `angular_z` es una mezcla ponderada entre ese valor y el giro del frame anterior (`self.prev_angular_z`), controlada por el parámetro `steer_smoothing` (0.0 = sin suavizar, usa el valor instantáneo tal cual; más cerca de 1.0 = más peso al pasado, más lento para reaccionar). El valor por defecto quedó en `0.0` tras comprobar en pruebas reales que un suavizado alto introducía demasiado retraso frente a curvas que exigen corregir rápido, y terminaba causando más choques, no menos — queda disponible para ajustarlo con calma vía `--ros-args -p steer_smoothing:=X` si hiciera falta en otro circuito.
+10. **Sistema híbrido de velocidad:** La **dirección** (`angular_z`, ya suavizada) sale directamente de lo que predijo la red, solo acotada a un rango físico seguro (`np.clip`). La **velocidad**, en cambio, combina la predicción de la IA con una regla de seguridad explícita: si la red predice un valor de avance por debajo de `reverse_threshold`, se interpreta como intención de retroceder y se acota a un rango de reversa controlado; si no, la velocidad de avance se reduce proporcionalmente según qué tan cerrado sea el giro (`turn_ratio`) — frenando en curvas cerradas y acelerando en tramos rectos.
+11. **Publicación del comando:** El resultado final se empaqueta en un mensaje `Twist` y se publica en `/cmd_vel` — el mismo tópico que efectivamente mueve las ruedas del auto en la simulación.
+12. **Manejo de excepciones:** Cualquier error durante el procesamiento de un frame individual se captura y se registra como log, sin tumbar el nodo completo — así un frame corrupto puntual no interrumpe la conducción. `FileNotFoundError` se captura por separado en `main()` para dar un cierre ordenado si el modelo nunca se encontró al arrancar.
 
-> **📝 Nota de depuración (errata corregida):** una versión anterior de este nodo desnormalizaba multiplicando por `0.50` y `0.70` (los límites físicos del auto) en vez de por `2.0` y `3.0` (el inverso exacto de la normalización de la Sección 2.7). Ese desajuste reducía el giro real enviado al auto a solo ~23% de lo que la red predecía internamente, causando que el auto no tomara bien las curvas y, al salirse ligeramente del trazado hacia imágenes fuera de la distribución de entrenamiento, la predicción de velocidad se volviera errática y activara reversa de forma espuria. Las constantes ya están corregidas en el código de arriba.
+> **📝 Nota de depuración 1 (errata de escala, corregida):** una versión anterior de este nodo desnormalizaba multiplicando por `0.50` y `0.70` (los límites físicos del auto) en vez de por `2.0` y `3.0` (el inverso exacto de la normalización de la Sección 2.7). Ese desajuste reducía el giro real enviado al auto a solo ~23% de lo que la red predecía internamente, causando que el auto no tomara bien las curvas.
+>
+> **📝 Nota de depuración 2 (suavizado, calibrado):** al corregir la escala, un frame puntualmente ruidoso empezó a producir giros bruscos de un instante a otro. Se probó agregar suavizado exponencial (`steer_smoothing`) para amortiguarlo, pero un valor alto (`0.6`) introdujo demasiado retraso frente a curvas que exigen corregir rápido, y el auto terminó chocando más seguido, incluso en tramos rectos — se dejó en `0.0` (desactivado) por defecto.
+>
+> **📝 Nota de depuración 3 (calidad del dataset, causa raíz real):** el motivo principal por el que el piloto seguía fallando en curvas específicas resultó ser **contaminación del dataset de entrenamiento**: durante algunas sesiones de grabación (Sección 4) hubo intervención manual del operador mezclada con los comandos del piloto auxiliar — `data_recorder_node` graba cualquier cosa que esté publicándose en `/cmd_vel`, sin distinguir su origen, así que esos errores humanos (incluyendo maniobras de reversa) quedaron grabados como si fueran ejemplos correctos, y la CNN los imitó fielmente. La solución fue descartar ese dataset y grabar una tanda nueva dejando manejar **exclusivamente** al piloto auxiliar, sin ninguna intervención manual durante la grabación. Con ese dataset limpio y las dos correcciones anteriores, el piloto completó la pista sin chocar.
 
 ---
 
@@ -665,6 +680,9 @@ ros2 run rqt_image_view rqt_image_view
 
 ### ❓ Pregunta 5: ¿Por qué la imagen se reduce a 160×120 en vez de usarse a resolución completa?
 **RESPUESTA:** Es un balance deliberado entre precisión y velocidad de entrenamiento/inferencia. Una imagen más grande significa más números de entrada, lo que multiplica el costo computacional de cada convolución (Sección 2.2) y el tamaño del vector aplanado antes de las capas totalmente conectadas (Sección 2.4). A 160×120 la red sigue teniendo información suficiente para distinguir el trazado de la pista (el objetivo de la tarea), mientras mantiene el entrenamiento en segundos/minutos y la inferencia en tiempo real, en vez de fracciones de segundo por frame que harían al piloto demasiado lento para reaccionar a tiempo.
+
+### ❓ Pregunta 6: ¿Puede el operador manejar manualmente durante la grabación de datos (Sección 4) para "ayudar" al piloto experto?
+**RESPUESTA: NO — hacerlo contamina el dataset y la CNN termina imitando los errores humanos.** `data_recorder_node` no distingue quién está manejando: graba cualquier comando que llegue a `/cmd_vel` junto con la imagen de la cámara en ese instante, sea del piloto auxiliar o de una intervención manual por teclado. Si el operador toma el control aunque sea brevemente durante la grabación (por ejemplo, para "rescatar" al piloto auxiliar si se traba), esos comandos —con eventuales errores, dudas o maniobras de reversa imprecisas— quedan grabados como si fueran ejemplos de buen manejo, y la Red Neuronal los aprende con la misma confianza que el resto del dataset. En este proyecto, ese fue precisamente el motivo real detrás de fallos puntuales en curvas específicas que dos correcciones de código (escala y suavizado) no lograron resolver del todo — la solución fue descartar el dataset contaminado y grabar una tanda nueva dejando manejar exclusivamente al piloto auxiliar, sin ninguna intervención manual.
 
 ---
 
