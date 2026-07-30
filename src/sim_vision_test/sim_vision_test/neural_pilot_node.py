@@ -50,6 +50,11 @@ class NeuralPilotNode(Node):
         self.declare_parameter('base_speed', 0.50)
         self.declare_parameter('max_angular_speed', 0.70)
         self.declare_parameter('reverse_threshold', -0.15)
+        # Peso del giro anterior en el suavizado exponencial (0 = sin suavizado, mas cerca de 1 = mas suave/lento)
+        self.declare_parameter('steer_smoothing', 0.6)
+
+        # Estado del giro suavizado entre frames (evita volantazos bruscos frame a frame)
+        self.prev_angular_z = 0.0
 
         # Cargar modelo entrenado
         model_path = os.path.expanduser('~/training_data/racer_model.pth')
@@ -95,10 +100,18 @@ class NeuralPilotNode(Node):
             base_speed = self.get_parameter('base_speed').value
             max_ang = self.get_parameter('max_angular_speed').value
             rev_thr = self.get_parameter('reverse_threshold').value
+            smoothing = self.get_parameter('steer_smoothing').value
 
             # --- SISTEMA HIBRIDO: IA DIRIGE, REGLA CONTROLA VELOCIDAD ---
             # La IA controla la direccion (angular_z) - esto lo aprendio bien
-            angular_z = float(np.clip(raw_angular, -max_ang, max_ang))
+            angular_z_instant = float(np.clip(raw_angular, -max_ang, max_ang))
+
+            # Suavizado exponencial (EMA): evita que un frame ruidoso produzca
+            # un volantazo brusco de golpe (cada frame se predice de forma
+            # independiente, sin memoria del anterior, asi que el suavizado
+            # se aplica aca en vez de en la red).
+            angular_z = smoothing * self.prev_angular_z + (1.0 - smoothing) * angular_z_instant
+            self.prev_angular_z = angular_z
 
             # La velocidad se calcula de forma inteligente:
             if raw_linear < rev_thr:
