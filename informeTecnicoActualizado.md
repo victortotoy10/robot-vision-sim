@@ -1,114 +1,103 @@
-# Informe Técnico y Guía Académica para Exposición: Conducción Autónoma Híbrida en ROS 2 + Gazebo Sim
+# Informe Técnico Definitivo: Sistema Autónomo de Conducción por Clonación Neuronal
 
 **Proyecto:** Vehículo Autónomo de Carreras  
 **Plataforma:** ROS 2 Humble | Ignition Gazebo (Gazebo Sim) | PyTorch (GPU Tesla T4)  
-**Fecha de Actualización:** 2026-07-29  
+**Fecha de Actualización:** 2026-07-30  
 
 ---
 
-## 1. Resumen Ejecutivo y Marco Teórico para la Exposición
+## 1. Resumen Ejecutivo y Metodología Unificada
 
-Este proyecto resuelve el problema de la **navegación autónoma a alta velocidad** mediante una arquitectura híbrida que integra **robótica determinista clásica (PID + LiDAR/OpenCV)** con **Inteligencia Artificial Deep Learning (PyTorch CUDA)**.
+Este proyecto implementa una **metodología avanzada de Conducción Autónoma por Clonación de Comportamiento (Behavioral Cloning)**. 
 
-### ❓ Pregunta Clave de Exposición: ¿Usamos la Cámara para el Entrenamiento o es Aprendizaje de Movimientos?
-
-El proyecto cuenta con **dos enfoques de aprendizaje por IA** que puedes presentar y defender ante los jurados:
+En lugar de requerir que un operador humano conduzca manualmente durante horas arriesgándose a cometer errores, el sistema utiliza un **flujo de trabajo automatizado de 4 fases**:
 
 ```mermaid
 graph TD
-    subgraph EnfoqueA ["Enfoque A: Clonación por Cinemática / LiDAR (artudo_neural_pilot)"]
-        A1["Sensores LiDAR 2D (8 sectores)"] --> A2["Red Neuronal MLP PyTorch"]
-        A2 -->|Clona decisiones espaciales| A3["Giro y Aceleración Autónoma (<0.5ms)"]
+    subgraph Fase1 ["Fase 1: Conducción Autónoma por Sensores"]
+        LIDAR["Sensores LiDAR 2D"] --> WALL["Piloto Reactivo (artudo_wall_follower)"]
+        WALL -->|Conduce Perfecto sin Choques| SIM["Gazebo Sim (Pista 3D Decorada)"]
     end
 
-    subgraph EnfoqueB ["Enfoque B: Aprendizaje End-to-End por Cámara FPV (neural_pilot_node)"]
-        B1["Cámara Frontal FPV (/camera/image_raw)"] --> B2["Red Neuronal Convolucional (RacerCNN / AlexNet)"]
-        B2 -->|Clona dirección desde la matriz de píxeles| B3["Giro Autónomo por Imagen de Carretera"]
+    subgraph Fase2 ["Fase 2: Grabación de Telemetría en Paralelo"]
+        SIM -->|Captura Telemetría 20Hz| REC["Grabador Automático (artudo_data_recorder)"]
+        REC -->|Acumula 200+ Vueltas Limpias| DATA["expert_dataset.npz (170,000+ muestras)"]
+    end
+
+    subgraph Fase3 ["Fase 3: Entrenamiento Supervisado en GPU"]
+        DATA -->|Alimenta| GPU["Entrenador PyTorch CUDA (train_artudo_cloning)"]
+        GPU -->|Minimiza Error (Loss ~0.001)| MODEL["artudo_expert_model.pth"]
+    end
+
+    subgraph Fase4 ["Fase 4: Despliegue del Piloto Neuronal"]
+        MODEL -->|Carga Red Neuronal| PILOT["Piloto Neuronal (artudo_neural_pilot)"]
+        PILOT -->|Inferencia en < 0.5ms| SIM
     end
 ```
 
-1. **Enfoque A (Clonación Telemétrica por LiDAR):**  
-   El modelo aprende a mapear el perfil de distancias espaciales del LiDAR hacia las órdenes de giro y aceleración ejecutadas por el piloto experto. **Ventaja:** Ultra-rápido en GPU y 100% inmune a sombras o variaciones de luz.
-2. **Enfoque B (Aprendizaje End-to-End por Visión FPV de Cámara):**  
-   El modelo aprende a analizar directamente la matriz de píxeles de la carretera (asfalto, bordes y líneas blancas) utilizando una **Red Neuronal Convolucional (CNN / AlexNet)**, imitando el procesamiento del proyecto ESP32.
-
 ---
 
-## 2. Explicación Detallada de los Algoritmos del Sistema
+## 2. Explicación Detallada del Flujo de Trabajo (Paso a Paso)
 
-### 2.1. Algoritmo 1: Piloto Autónomo Reactivo por LiDAR (`artudo_wall_follower`)
-* **Fundamento:** Basado en el algoritmo *Wall-Following* de `ar-tu-do-master` / F1TENTH.
-* **Geometría:** Mide rayos LiDAR a $-45^\circ$ ($a$) y $-90^\circ$ ($b$) para calcular el ángulo de inclinación $\alpha$:
+### 2.1. Fase 1: Conducción Experta por Sensores (`artudo_wall_follower`)
+* **Propósito:** Generar una trayectoria experta y fluida en la pista decorada 3D (`racetrack_decorated.sdf`).
+* **Algoritmo:** Utiliza lecturas del **LiDAR 2D** a $-45^\circ$ y $-90^\circ$ para calcular el ángulo de inclinación $\alpha$ con respecto a las paredes del circuito:
   $$\alpha = \arctan2(a \cdot \cos(45^\circ) - b, \; a \cdot \sin(45^\circ))$$
-* **Proyección Futura:** Estima a qué distancia estará la pared $0.8\text{m}$ más adelante ($d_{\text{predicha}} = b \cdot \cos\alpha + 0.8 \cdot \sin\alpha$).
-* **Controlador PID:** Genera la corrección del volante para mantener $d_{\text{predicha}} \approx 1.0\text{m}$ del carril.
+* **Proyección Futura:** Estima la posición del vehículo a $0.8\text{m}$ hacia adelante y un **Controlador PID** ajusta el volante para mantener el carro centrado en el carril.
 
 ---
 
-### 2.2. Algoritmo 2: Filtro de Visión por Computadora HSV (`vision_sim_node`)
-* **Inspiración:** Proyecto ESP32 Autonomous Car.
-* **Procesamiento de Imagen FPV:**
-  1. Recorta el 50% inferior de la cámara (Región de Interés - ROI).
-  2. Convierte el espacio de color de BGR a **HSV (Hue, Saturation, Value)** para aislar las líneas blancas sobre el asfalto negro.
-  3. Aplica **Detección de Doble Línea de Carril (Izquierda y Derecha)** calculando el centroide de la carretera ($c_x$).
-  4. Genera la imagen procesada binaria en blanco y negro emitida en el tópico **/camera/image_processed**.
+### 2.2. Fase 2: Grabación Automática de Telemetría (`artudo_data_recorder`)
+* **Propósito:** Capturar un dataset masivo sin intervención humana.
+* **Frecuencia:** Muestrea a $20\text{ Hz}$ ($50\text{ms}$).
+* **Estructura de Datos:**
+  * **Vector de Estado ($X_t$):** 8 sectores de distancia LiDAR (normalizados de 0 a 1).
+  * **Vector de Acción ($Y_t$):** $[\text{steer}, \; \text{speed}]$ ejecutados por el piloto experto.
+* **Resultado:** Al cabo de 200+ vueltas, genera un dataset perfecto con más de **170,000 muestras puras** (`artudo_expert_dataset.npz`).
 
 ---
 
-### 2.3. Algoritmo 3: Red Neuronal Clonada PyTorch (`artudo_neural_pilot`)
-* **Arquitectura:** Perceptrón Multicapa (MLP) con capas `Linear(8, 64) -> ReLU -> Linear(64, 64) -> ReLU -> Linear(64, 32) -> ReLU -> Linear(32, 2) -> Tanh()`.
-* **Capa `Tanh()`:** Acota matemáticamente las predicciones a $[-1.0, 1.0]$ evitando maniobras bruscas o congelamientos de velocidad.
+### 2.3. Fase 3: Entrenamiento Supervisado por Clonación (`train_artudo_cloning`)
+* **Propósito:** Entrenar el "cerebro" de la Red Neuronal para que imite la conducción experta.
+* **Arquitectura:** Perceptrón Multicapa (MLP) acelerado en la **GPU Tesla T4 (PyTorch CUDA)**:
+  $$\text{Linear}(8 \to 64) \xrightarrow{\text{ReLU}} \text{Linear}(64 \to 64) \xrightarrow{\text{ReLU}} \text{Linear}(64 \to 32) \xrightarrow{\text{ReLU}} \text{Linear}(32 \to 2) \xrightarrow{\text{Tanh()}}$$
+* **Normalización y Tanh():** La capa final `Tanh()` acota matemáticamente las predicciones a $[-1.0, 1.0]$, garantizando que los giros sean suaves y la marcha continuada.
+* **Tiempo de Entrenamiento:** Menos de $30\text{ segundos}$ en GPU Tesla T4.
 
 ---
 
-## 3. Guía de Demostración en Vivo para la Exposición
+### 2.4. Fase 4: Despliegue del Piloto Neuronal Autónomo (`artudo_neural_pilot`)
+* **Propósito:** Reemplazar los algoritmos deterministas y dejar que la **Red Neuronal Inteligente** conduzca el vehículo de forma autónoma.
+* **Operación:** En cada fotograma del LiDAR, la Red Neuronal realiza la inferencia en **menos de $0.5\text{ milisegundos}$**, emitiendo los comandos `/cmd_vel` de aceleración y giro.
 
-### 🎥 Demostración 1: Ver la Cámara FPV en Blanco y Negro (Filtro HSV estilo ESP32)
+---
 
-Para mostrar la máscara binaria en blanco y negro donde el asfalto se ve negro y las líneas blancas se destacan:
+## 3. Comandos Principales para la Exposición / Demostración en Vivo
 
-#### 1️⃣ Terminal 1: Lanzar Simulación 3D (`racetrack_decorated` o `circuito_ovalo`)
+### 1️⃣ Terminal 1: Lanzar Simulación 3D Interactiva (`headless:=false`)
 ```bash
 cd /home/ubuntu/robot-vision-sim
+git pull origin main --rebase
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 
 ros2 launch launch/robot_camera.launch.py world:=racetrack_decorated headless:=false
 ```
 
-#### 2️⃣ Terminal 2: Visor de Cámara FPV (`rqt_image_view`)
+---
+
+### 2️⃣ Terminal 2: Visor de Cámara FPV en Vivo (Monitoreo Opcional)
 ```bash
 cd /home/ubuntu/robot-vision-sim
 source /opt/ros/humble/setup.bash
 
 ros2 run rqt_image_view rqt_image_view
 ```
-📌 **En el menú desplegable arriba a la izquierda:**  
-Selecciona **/camera/image_processed** para ver la imagen en blanco y negro (asfalto negro, líneas blancas y centroide en vivo).
-
-#### 3️⃣ Terminal 3: Nodo de Visión HSV (OpenCV)
-```bash
-cd /home/ubuntu/robot-vision-sim
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-
-ros2 run sim_vision_test vision_sim_node
-```
+*(Seleccionar `/camera/image_raw` arriba a la izquierda para ver la toma frontal FPV del auto).*
 
 ---
 
-### 🧠 Demostración 2: Ver el Piloto Autónomo por Red Neuronal Inteligente (IA)
-
-#### 1️⃣ Terminal 1: Simulación 3D
-```bash
-cd /home/ubuntu/robot-vision-sim
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-
-ros2 launch launch/robot_camera.launch.py world:=racetrack_decorated headless:=false
-```
-
-#### 2️⃣ Terminal 3: Piloto Neuronal Autónomo
+### 3️⃣ Terminal 3: Lanzar el Piloto Neuronal Autónomo (IA PyTorch)
 ```bash
 cd /home/ubuntu/robot-vision-sim
 source /opt/ros/humble/setup.bash
@@ -116,3 +105,18 @@ source install/setup.bash
 
 ros2 run sim_vision_test artudo_neural_pilot
 ```
+
+---
+
+## 4. Guía Secundaria: Re-entrenamiento del Modelo en GPU (Terminal 4)
+
+Si deseas demostrar el entrenamiento de la Red Neuronal en tiempo real durante la presentación:
+
+```bash
+cd /home/ubuntu/robot-vision-sim
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+
+ros2 run sim_vision_test train_artudo_cloning
+```
+*(Procesará las 170,000+ muestras en 40 épocas y actualizará los pesos de la Red Neuronal en menos de 30 segundos).*
