@@ -1,0 +1,9 @@
+# Dependencias EXTRA, solo necesarias para las líneas de trabajo opcionales
+# (no forman parte del pipeline CNN principal):
+#   - Piloto por Aprendizaje por Refuerzo / PPO -> gymnasium, stable-baselines3
+#
+# Instalar solo si vas a usar esa parte opcional del proyecto:
+#   pip3 install -r requirements-optional.txt
+
+gymnasium>=0.29.0
+stable-baselines3>=2.0.0

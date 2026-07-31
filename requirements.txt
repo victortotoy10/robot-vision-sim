@@ -1,0 +1,11 @@
+# Dependencias Python del PIPELINE CNN (piloto experto -> grabadora -> entrenamiento -> piloto autónomo).
+# Instalar con: pip3 install -r requirements.txt
+#
+# Nota: cv_bridge y python3-opencv se instalan vía apt (scripts/install_ros2_gazebo.sh),
+# no vía pip, para mantener compatibilidad binaria con ROS 2 Humble.
+#
+# torch se instala por separado con scripts/install_python_deps.sh (elige CPU o CUDA
+# según tu hardware) — no lo instales directamente desde este archivo.
+
+pandas>=1.5.0
+numpy>=1.23.0
