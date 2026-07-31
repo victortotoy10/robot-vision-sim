@@ -12,7 +12,7 @@
 #   ./scripts/setup_all.sh --cuda   # PyTorch con GPU NVIDIA (si tenés una)
 #
 # Para instalar además las herramientas opcionales (RViz2, teleclado,
-# visor de cámara, dependencias de RL/PPO):
+# visor de cámara):
 #   ./scripts/install_optional_tools.sh
 # ============================================================================
 set -euo pipefail

@@ -87,7 +87,7 @@ espacio en disco y paquetes de una instalación "desktop" completa).
 Siguiente paso: instalar PyTorch/pandas/numpy (pipeline CNN)
     ./scripts/install_python_deps.sh
 
-Opcional (RViz2, teleclado, visor de cámara, RL/PPO):
+Opcional (RViz2, teleclado, visor de cámara):
     ./scripts/install_optional_tools.sh
 
 Recordá agregar esto a tu ~/.bashrc para no tener que sourcear siempre:

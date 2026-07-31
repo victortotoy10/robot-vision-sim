@@ -3,7 +3,7 @@
 **Proyecto:** Vehículo Autónomo de Carreras — Conducción 100% por Visión de Cámara  
 **Plataforma de Simulación:** ROS 2 Humble | Ignition Gazebo (Gazebo Sim) | PyTorch (CUDA Tesla T4)  
 **Dominio Académico:** Visión por Computadora, Deep Learning End-to-End (Aprendizaje por Imitación), Control en Bucle Cerrado  
-**Alcance de este informe:** Este documento cubre el pipeline completo del piloto por cámara: el **piloto experto por LiDAR** que genera los datos de manejo correcto (flujo y código completo en la Sección 4), la grabación de imágenes, la arquitectura y entrenamiento de la Red Neuronal Convolucional (CNN), y el piloto autónomo final por cámara. La visión clásica por color (OpenCV/HSV) y el piloto por Aprendizaje por Refuerzo (PPO) son líneas de trabajo separadas del proyecto y no se desarrollan acá.  
+**Alcance de este informe:** Este documento cubre el pipeline completo del piloto por cámara: el **piloto experto por LiDAR** que genera los datos de manejo correcto (flujo y código completo en la Sección 4), la grabación de imágenes, la arquitectura y entrenamiento de la Red Neuronal Convolucional (CNN), y el piloto autónomo final por cámara. La visión clásica por color (OpenCV/HSV, ver `INFORME_VISION.md`) es una línea de trabajo separada y no se desarrolla acá.  
 **Fecha de Actualización:** 2026-07-30
 
 ---
@@ -59,6 +59,8 @@ Una imagen de cámara se representa numéricamente como un **tensor** (un arregl
 $$I_{norm}(x,y,c) = \frac{I(x,y,c)}{255}$$
 
 Normalizar es importante porque las redes neuronales entrenan mejor y más rápido cuando sus entradas están en rangos numéricos pequeños y centrados, en vez de rangos grandes como $[0,255]$.
+
+> **¿Por qué 160×120 y no la resolución nativa de la cámara?** Es un balance deliberado entre precisión y velocidad. Una imagen más grande implica más números de entrada, lo que multiplica el costo de cada convolución (Sección 2.2) y el tamaño del vector aplanado antes de las capas totalmente conectadas (Sección 2.4). A 160×120 la red conserva la información suficiente para distinguir el trazado de la pista, mientras mantiene el entrenamiento en minutos y la inferencia en tiempo real — a resolución completa, tanto el entrenamiento como cada frame de inferencia serían notablemente más lentos sin una mejora proporcional en el resultado.
 
 ---
 
@@ -1184,155 +1186,29 @@ if __name__ == '__main__':
 
 ---
 
-## 8. Guía Práctica de Ejecución en AWS
+## 8. Cómo Ejecutar Este Pipeline
 
-El piloto CNN **no viene entrenado de fábrica** — el modelo se genera siguiendo estas 4 fases (la primera, una sola vez; después el modelo entrenado se reutiliza siempre que no se lo vuelva a sobrescribir). Cada bloque de comandos incluye la ruta completa (`cd`) y el `source` correspondiente, para poder tipearlos o copiarlos tal cual en una terminal nueva sin pasos implícitos.
+El piloto CNN **no viene entrenado de fábrica** — el modelo se genera siguiendo 5 fases (la primera, bootstrap del piloto experto, una sola vez; después el modelo entrenado se reutiliza siempre que no se lo vuelva a sobrescribir):
 
-### 0️⃣ Paso 0: Sincronizar Repositorio y Compilar
+| Fase | Qué hace | Sección de este informe |
+|---|---|---|
+| 0 — Bootstrap del piloto experto | PID por LiDAR → grabador de telemetría → clonación de comportamiento | Sección 4 |
+| 1 — El piloto experto maneja | `artudo_neural_pilot` conduce solo, por LiDAR | Sección 4.6 |
+| 2 — Grabar la cámara | `data_recorder_node` graba imagen + comando mientras el piloto experto maneja | Sección 5 |
+| 3 — Entrenar la CNN | `train_cnn` entrena `RacerCNN` sobre el dataset grabado | Sección 6 |
+| 4 — Manejar solo con la cámara | `neural_pilot_node` — el resultado final | Sección 7 |
 
-```bash
-cd /home/ubuntu/robot-vision-sim
-git pull origin main --rebase
-source /opt/ros/humble/setup.bash
-colcon build --packages-select sim_vision_test
-source install/setup.bash
-```
+**Los comandos completos, terminal por terminal y con rutas listas para copiar y pegar, están en el [`README.md`](README.md) del repositorio** — esa es la guía operativa de referencia; este informe se concentra en explicar el *porqué* de cada paso y el código detrás de él, no en repetir los comandos.
 
-### 🧭 Fase 1: Generar el Piloto Experto (LiDAR) — se corre una sola vez
+> ⏱️ **Cuánto grabar en la Fase 2:** la calidad del piloto final depende directamente de cuántos datos variados se graben. Sesiones cortas (del orden de 1-2 horas) resultaron **insuficientes** en la práctica — el piloto termina fallando en curvas o situaciones que el dataset no cubrió lo suficiente. Grabar en múltiples sesiones, con varias vueltas completas por sesión y buena variedad de curvas, da resultados notablemente mejores que una sola sesión corta.
 
-Si ya existe `~/dataset_artudo/artudo_expert_model.pth` de una sesión anterior, esta fase se puede **saltear** e ir directo a la Fase 2. Si no existe, generarlo con el flujo completo de la Sección 4:
+### ☁️ Opción con más recursos: AWS EC2 (opcional, solo si tenés presupuesto)
 
-**Terminal 1 — Simulación 3D:**
-```bash
-cd /home/ubuntu/robot-vision-sim
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 launch launch/robot_camera.launch.py world:=racetrack headless:=true
-```
-
-**Terminal 2 — Controlador PID sin IA (Sección 4.3), genera el manejo base:**
-```bash
-cd /home/ubuntu/robot-vision-sim
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 run sim_vision_test artudo_wall_follower
-```
-
-**Terminal 3 — Grabador de telemetría LiDAR (Sección 4.4):**
-```bash
-cd /home/ubuntu/robot-vision-sim
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 run sim_vision_test artudo_data_recorder
-```
-Dejalo grabando varias vueltas (a más muestras, mejor clona el comportamiento del PID). Al terminar, `Ctrl+C` **en la Terminal 3** — el guardado del dataset ocurre recién al cerrar el nodo (Sección 4.4, punto 8). Después, cerrar también las Terminales 1 y 2.
-
-**Terminal 4 — Entrenar la red del piloto experto (Sección 4.5):**
-```bash
-cd /home/ubuntu/robot-vision-sim
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 run sim_vision_test train_artudo_cloning
-```
-Guarda el modelo en `~/dataset_artudo/artudo_expert_model.pth`. A partir de acá, el piloto experto (`artudo_neural_pilot`) ya puede usarse en la Fase 2 sin volver a repetir este bootstrap.
-
-### 📼 Fase 2: Grabar Datos de Entrenamiento (Cámara)
-
-Esta fase necesita que **algo** maneje el auto correctamente mientras la cámara graba (Paso 1 de la Sección 1). Se usa el piloto experto generado en la Fase 1:
-
-**Terminal 1 — Simulación 3D:**
-```bash
-cd /home/ubuntu/robot-vision-sim
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 launch launch/robot_camera.launch.py world:=racetrack_decorated headless:=false
-```
-
-**Terminal 2 — Piloto experto por LiDAR (Sección 4.6), genera el movimiento a grabar:**
-```bash
-cd /home/ubuntu/robot-vision-sim
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 run sim_vision_test artudo_neural_pilot
-```
-
-**Terminal 3 — Grabador de imágenes + comandos (Sección 5):**
-```bash
-cd /home/ubuntu/robot-vision-sim
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 run sim_vision_test data_recorder_node
-```
-⚠️ **No manejar manualmente durante esta fase** (ver Nota de depuración 3, Sección 7) — dejalo grabando varios minutos (varias vueltas — cuantas más, mejor generaliza la CNN, y el balanceo de datos de la Sección 6 aprovecha mejor cuanta más variedad de curvas haya). Al terminar, `Ctrl+C` en esta terminal. Los datos quedan en `~/training_data/images/` y `~/training_data/data.csv`, acumulándose entre sesiones sin borrarse.
-
-### 🧠 Fase 3: Entrenar la CNN (Sección 6)
-
-**Terminal 4 — Entrenamiento (podés cerrar las Terminales 1-3 primero):**
-```bash
-cd /home/ubuntu/robot-vision-sim
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 run sim_vision_test train_cnn
-```
-Muestra el progreso por época (`Epoch 05/80 | Train Loss... | Val Loss...`) y guarda el modelo final en `~/training_data/racer_model.pth`.
-
-### 🚗 Fase 4: Manejar Solo con la Cámara (Sección 7 — el resultado final)
-
-**Terminal 1 — Simulación 3D (reabrir):**
-```bash
-cd /home/ubuntu/robot-vision-sim
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 launch launch/robot_camera.launch.py world:=racetrack_decorated headless:=false
-```
-
-**Terminal 2 — Piloto CNN por cámara:**
-```bash
-cd /home/ubuntu/robot-vision-sim
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 run sim_vision_test neural_pilot_node
-```
-Esta terminal es la que maneja por cámara de verdad: publica en `/cmd_vel` con base en lo que predice la CNN sobre la imagen — el auto se mueve solo, mirando únicamente `/camera/image_raw`.
-
-**Terminal 3 (opcional) — Ver lo que la CNN está mirando:**
-```bash
-cd /home/ubuntu/robot-vision-sim
-source /opt/ros/humble/setup.bash
-ros2 run rqt_image_view rqt_image_view
-```
-*(Seleccionar `/camera/image_raw`).*
-
-⚠️ **Nunca correr dos pilotos que publiquen en `/cmd_vel` al mismo tiempo** — ni `artudo_wall_follower` junto con `artudo_neural_pilot` (Fase 1), ni `artudo_neural_pilot` (Fase 2) junto con `neural_pilot_node` (Fase 4). Todos publican en el mismo tópico y se pisan las órdenes entre sí.
+Todo este pipeline corre en una laptop sin GPU (más lento, pero funcional). Si tenés presupuesto y querés acelerar el entrenamiento y el renderizado de Gazebo con una GPU dedicada, se puede correr exactamente el mismo pipeline en una instancia AWS EC2 con GPU (por ejemplo `g4dn.xlarge`, NVIDIA T4) en vez de tu máquina local — la única diferencia es la ruta del repositorio y que `torch` detecta la GPU automáticamente (`cuda` en vez de `cpu`), sin cambiar ni una línea de código. Detalle de instancias recomendadas, configuración de escritorio remoto sin monitor físico y costos aproximados en [`INFORME_VISION.md`, Sección 8](INFORME_VISION.md).
 
 ---
 
-## 9. Preguntas Frecuentes para la Exposición Académica
-
-### ❓ Pregunta 1: Si el informe es sobre la cámara, ¿por qué aparece un piloto por LiDAR en la Fase 2?
-**RESPUESTA:** Porque entrenar por imitación requiere ejemplos de manejo correcto, y algo tiene que generar esos ejemplos primero. En vez de manejar manualmente con teclado durante horas, se construyó un piloto experto por LiDAR (Sección 4) que maneja bien por sí solo, y se lo usa únicamente como generador automático de datos para el piloto por cámara. A diferencia de versiones anteriores de este informe, el piloto experto **sí está documentado en detalle** (Sección 4: su flujo de bootstrap, arquitectura y código completo) — no es una caja negra, simplemente es una pieza de infraestructura separada del resultado final, que sigue siendo 100% por cámara.
-
-### ❓ Pregunta 2: ¿La CNN realmente aprende sola, o hay reglas de color o umbral programadas a mano?
-**RESPUESTA: No hay ninguna regla manual.** Revisando el código completo de la Sección 7, la única entrada del nodo es la imagen cruda (`/camera/image_raw`), preprocesada solo con un redimensionado y una normalización numérica (Sección 2.1) — no hay ningún `if` que busque un color específico, ni ningún umbral fijo. Todo el criterio de "qué mirar en la imagen" está codificado en los pesos numéricos de la red (Sección 3), ajustados automáticamente durante el entrenamiento (Sección 2.6) a partir de los ejemplos grabados.
-
-### ❓ Pregunta 3: ¿Es un sistema de bucle cerrado (*closed-loop*) o simplemente repite una secuencia grabada?
-**RESPUESTA: Es bucle cerrado.** El piloto CNN (Sección 7) recibe una imagen nueva de la cámara en cada callback y recalcula la predicción desde cero cada vez — no reproduce ninguna secuencia de comandos pregrabada. Si se cambia la posición del auto en la pista o se modifica el entorno, la próxima imagen que llegue va a ser distinta, y la red va a predecir un comando distinto en consecuencia, porque literalmente está mirando la situación actual en cada instante. Lo mismo aplica al piloto experto por LiDAR (Sección 4.6): cada lectura nueva de `/scan` dispara una inferencia nueva.
-
-### ❓ Pregunta 4: ¿Qué pasa si el dataset grabado tiene muy pocas curvas comparado con tramos rectos?
-**RESPUESTA:** Sin corrección, la red aprendería a predecir "seguir derecho" casi siempre, porque eso ya minimiza gran parte del error promedio (Sección 2.5) sobre un dataset dominado por rectas, y fallaría específicamente en las curvas — que es el caso donde más importa que decida bien. Por eso el script de entrenamiento de la CNN (Sección 6, bloque de balanceo de datos) descarta aleatoriamente una gran proporción de los ejemplos de tramo recto y de auto detenido, dejando intactas las curvas y las reversas. El entrenamiento del piloto experto por LiDAR (Sección 4.5) enfrenta el mismo problema y lo resuelve de otra forma: en vez de descartar muestras, **pondera** el error de cada una según qué tan cerrado sea su giro objetivo.
-
-### ❓ Pregunta 5: ¿Por qué la imagen se reduce a 160×120 en vez de usarse a resolución completa?
-**RESPUESTA:** Es un balance deliberado entre precisión y velocidad de entrenamiento/inferencia. Una imagen más grande significa más números de entrada, lo que multiplica el costo computacional de cada convolución (Sección 2.2) y el tamaño del vector aplanado antes de las capas totalmente conectadas (Sección 2.4). A 160×120 la red sigue teniendo información suficiente para distinguir el trazado de la pista (el objetivo de la tarea), mientras mantiene el entrenamiento en segundos/minutos y la inferencia en tiempo real, en vez de fracciones de segundo por frame que harían al piloto demasiado lento para reaccionar a tiempo.
-
-### ❓ Pregunta 6: ¿Puede el operador manejar manualmente durante la grabación de datos (Sección 5) para "ayudar" al piloto experto?
-**RESPUESTA: NO — hacerlo contamina el dataset y la CNN termina imitando los errores humanos.** `data_recorder_node` no distingue quién está manejando: graba cualquier comando que llegue a `/cmd_vel` junto con la imagen de la cámara en ese instante, sea del piloto experto o de una intervención manual por teclado. Si el operador toma el control aunque sea brevemente durante la grabación (por ejemplo, para "rescatar" al piloto experto si se traba), esos comandos —con eventuales errores, dudas o maniobras de reversa imprecisas— quedan grabados como si fueran ejemplos de buen manejo, y la Red Neuronal los aprende con la misma confianza que el resto del dataset. En este proyecto, ese fue precisamente el motivo real detrás de fallos puntuales en curvas específicas que dos correcciones de código (escala y suavizado) no lograron resolver del todo — la solución fue descartar el dataset contaminado y grabar una tanda nueva dejando manejar exclusivamente al piloto experto, sin ninguna intervención manual.
-
-### ❓ Pregunta 7: ¿Hay que regenerar el piloto experto (Fase 1) cada vez que se quiere entrenar la CNN?
-**RESPUESTA: No.** La Fase 1 (Sección 4, bootstrap del piloto experto: PID → grabador LiDAR → clonación) se corre **una sola vez**. Una vez que existe `~/dataset_artudo/artudo_expert_model.pth`, el nodo `artudo_neural_pilot` queda disponible indefinidamente para generar tantas sesiones de grabación de cámara (Fase 2) como se necesiten, en cualquier pista, sin volver a tocar el PID ni reentrenar la red del piloto experto. Solo haría falta regenerarlo si se quisiera cambiar su comportamiento base (por ejemplo, ajustar los parámetros del PID en `artudo_wall_follower_node.py`, Sección 4.3).
-
----
-
-## 10. Glosario de Términos Técnicos (Para Entender Sin Tecnicismos)
+## 9. Glosario de Términos Técnicos (Para Entender Sin Tecnicismos)
 
 | Término | Qué significa en criollo |
 |---|---|

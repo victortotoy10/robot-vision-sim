@@ -143,6 +143,8 @@ ros2 run teleop_twist_keyboard teleop_twist_keyboard
 
 ## 8. Análisis de Rendimiento Extendido: Migración a la Nube (AWS) y Plan de Autonomía
 
+> **Esto es opcional.** El pipeline CNN principal (ver `README.md` e `informeTecnicoCNN.md`) corre perfectamente en una laptop sin GPU — más lento que con una GPU dedicada, pero funcional. Esta sección es para quienes tienen presupuesto disponible y quieren acelerar el entrenamiento y el renderizado con una GPU en la nube; no es un requisito del proyecto.
+
 Si la simulación en tu Máquina Virtual (VM) local sigue experimentando tirones y lag a pesar de asignar más recursos, la causa raíz es el **cuello de botella de renderizado 3D**. En una VM estándar, la tarjeta gráfica está emulada (no hay GPU dedicada por hardware), por lo que el procesador (CPU) debe encargarse del motor físico de Gazebo y, simultáneamente, renderizar mediante software (Mesa LLVMpipe) los gráficos y la imagen del sensor de la cámara.
 
 Para lograr una simulación 100% fluida a 30+ FPS estables sin tirones, se recomienda migrar a un entorno en la nube con **aceleración gráfica dedicada**.

@@ -43,8 +43,5 @@ Dependencias Python del pipeline CNN instaladas.
 
 Siguiente paso: compilar el workspace ROS 2
     ./scripts/build_workspace.sh
-
-(Opcional: si vas a usar el piloto por Aprendizaje por Refuerzo (PPO), instalá
- además Gymnasium/Stable-Baselines3 con ./scripts/install_optional_tools.sh)
 ============================================================================
 EOF

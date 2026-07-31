@@ -4,7 +4,7 @@
 
 > ✅ **Resultado logrado:** el piloto CNN (`neural_pilot_node`) completa el circuito sin colisionar, manejando en bucle cerrado a partir únicamente de los píxeles de `/camera/image_raw` — sin LiDAR y sin ninguna regla de color programada a mano. Este es el resultado central del proyecto y lo único que este README documenta en detalle.
 >
-> El repositorio también contiene dos líneas de trabajo **opcionales** (un piloto por Aprendizaje por Refuerzo con LiDAR, y un seguidor de línea clásico por OpenCV) que no forman parte del flujo principal — ver [Sección 11](#-extensiones-opcionales-no-forman-parte-del-flujo-principal).
+> El repositorio también contiene una línea de trabajo **opcional** (un seguidor de línea clásico por OpenCV, sin Deep Learning) que no forma parte del flujo principal — ver [Sección 11](#-extensiones-opcionales-no-forman-parte-del-flujo-principal).
 
 ---
 
@@ -119,10 +119,8 @@ robot-vision-sim/
 │   └── robot.rviz                        # Configuración de RViz2 (solo necesaria para depuración visual opcional)
 ├── scripts/                               # Instalación (ver Sección 6)
 ├── requirements.txt                       # Dependencias Python del pipeline CNN (torch, pandas, numpy)
-├── requirements-optional.txt              # Dependencias solo para la línea opcional de RL (gymnasium, stable-baselines3)
 ├── informeTecnicoCNN.md                   # Informe técnico completo del pipeline CNN (este es el documento de referencia)
-├── informeAprendizajeRefuerzo.md          # Informe de la línea opcional de RL/PPO
-└── INFORME_VISION.md                      # Informe de la línea opcional de visión clásica + notas de infraestructura
+└── INFORME_VISION.md                      # Informe de la línea opcional de visión clásica + notas de infraestructura + AWS opcional
 ```
 
 > `urdf/my_robot.urdf` es una versión anterior sin uso actual — el launch file carga `racer_robot.urdf`. No hace falta tocarlo.
@@ -148,17 +146,18 @@ robot-vision-sim/
 
 ## 💻 Requisitos de sistema (optimizado para laptop)
 
-Pensado para correr en una laptop modesta, **sin GPU dedicada** — el entrenamiento de la CNN es liviano (imágenes de 160×120, dataset chico) y corre bien en CPU:
+Pensado para correr en una laptop modesta, **sin GPU dedicada** — el entrenamiento de la CNN en sí es liviano (imágenes de 160×120, dataset chico). El cuello de botella real casi siempre es **Gazebo** (el motor de simulación 3D), no PyTorch.
 
-| Componente | Mínimo (headless, sin GUI 3D) | Cómodo |
+| Componente | Linux nativo o WSL2 | Máquina Virtual tradicional (VirtualBox/VMware) |
 | :--- | :--- | :--- |
-| **SO** | Ubuntu 22.04 LTS (x86_64) — nativo o WSL2 | Ubuntu 22.04 LTS |
-| **CPU** | 2 núcleos | 4 núcleos |
-| **RAM** | 4 GB | 8 GB |
-| **Disco** | 6 GB libres | 10 GB libres |
-| **GPU** | No requerida (PyTorch CPU, Gazebo con renderizado por software) | Opcional — acelera el entrenamiento, no es necesaria |
+| **CPU** | 2 núcleos (headless) / 4 núcleos (con GUI 3D) | **4 núcleos dedicados como mínimo real** |
+| **RAM** | 4 GB (headless) / 8 GB (con GUI 3D) | **8 GB como mínimo real**, 12+ GB para ir cómodo |
+| **Disco** | 6-10 GB libres, SSD recomendado | Igual, evitando disco compartido/en red |
+| **GPU** | No requerida (PyTorch CPU, Gazebo con renderizado por software) | No requerida, pero el renderizado por software pesa más dentro de una VM |
 
-No hace falta GPU ni una instancia en la nube para correr el pipeline CNN completo. Ver [Sección 10](#-consejos-de-rendimiento-para-laptops-modestas) para exprimir aún más el rendimiento en equipos limitados.
+⚠️ **Importante sobre máquinas virtuales:** los números de la columna izquierda son para Linux corriendo directo sobre el hardware (o WSL2, que tiene una integración mucho más liviana con Windows). En pruebas reales, una VM tradicional (VirtualBox/VMware) con recursos ya generosos (4+ núcleos, ~9 GB RAM) **siguió sintiéndose lenta** — no es solo cuestión de sumar más CPU/RAM. La causa de fondo es que Gazebo renderiza por software (Mesa LLVMpipe) dentro de la VM, y ese renderizado tiene un techo de rendimiento bastante bajo sin importar cuántos recursos le asignes, sobre todo si la aceleración 3D de la VM no está bien configurada (revisá que esté habilitada en la config del hipervisor — ej. `VMSVGA` en VirtualBox — y forzá `headless:=true` mientras grabás/entrenás, que es donde más ayuda). Si después de eso una VM tradicional te sigue resultando lenta, **WSL2 o Linux nativo dan una experiencia notablemente mejor** para este proyecto específicamente por cómo manejan el renderizado 3D — si tenés esa opción, es la ruta más confiable en una laptop sin GPU dedicada.
+
+Ver [Sección 10](#-consejos-de-rendimiento-para-laptops-modestas) para más formas de aliviar el rendimiento en equipos limitados.
 
 ---
 
@@ -213,7 +212,7 @@ Si el comando anterior imprime `sim_vision_test`, la instalación fue exitosa.
 
 ### Herramientas opcionales (NO hacen falta para el pipeline CNN)
 
-Solo si vas a depurar visualmente (RViz2, visor de cámara, teleclado) o vas a explorar la línea opcional de RL/PPO (Gymnasium + Stable-Baselines3):
+Solo si vas a depurar visualmente con RViz2, ver la cámara en vivo, o probar el seguidor de línea clásico (`vision_sim_node`, ver [`INFORME_VISION.md`](INFORME_VISION.md)):
 ```bash
 cd ~/robot-vision-sim
 ./scripts/install_optional_tools.sh
@@ -225,7 +224,7 @@ cd ~/robot-vision-sim
 | [`scripts/install_python_deps.sh`](scripts/install_python_deps.sh) | PyTorch (CPU por defecto, `--cuda` opcional), pandas, numpy | Siempre (paso 2) |
 | [`scripts/build_workspace.sh`](scripts/build_workspace.sh) | Compila el paquete `sim_vision_test` con `colcon build` | Siempre (paso 3), y de nuevo cada vez que se modifique el código |
 | [`scripts/setup_all.sh`](scripts/setup_all.sh) | Corre los 3 anteriores en orden | Alternativa a hacerlo paso a paso (Opción A) |
-| [`scripts/install_optional_tools.sh`](scripts/install_optional_tools.sh) | RViz2, `rqt_image_view`, teleclado, Gymnasium/Stable-Baselines3 | **Opcional** — no hace falta para el pipeline CNN |
+| [`scripts/install_optional_tools.sh`](scripts/install_optional_tools.sh) | RViz2, `rqt_image_view`, teleclado | **Opcional** — no hace falta para el pipeline CNN |
 
 ---
 
@@ -296,7 +295,9 @@ source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 run sim_vision_test data_recorder_node
 ```
-⚠️ **No manejar manualmente durante esta fase** — `data_recorder_node` graba cualquier cosa que llegue a `/cmd_vel`, y una intervención humana contamina el dataset (ver [Sección 9](#-problemas-resueltos-durante-el-desarrollo)). Dejalo grabar varias vueltas; cuantas más, mejor generaliza la CNN. `Ctrl+C` en la Terminal 3 para terminar. Los datos quedan en `~/training_data/images/` y `~/training_data/data.csv`, acumulándose entre sesiones.
+⚠️ **No manejar manualmente durante esta fase** — `data_recorder_node` graba cualquier cosa que llegue a `/cmd_vel`, y una intervención humana contamina el dataset (ver [Sección 9](#-problemas-resueltos-durante-el-desarrollo)). `Ctrl+C` en la Terminal 3 para terminar. Los datos quedan en `~/training_data/images/` y `~/training_data/data.csv`, acumulándose entre sesiones (podés repetir esta fase varias veces y los datos se suman, no se pisan).
+
+⏱️ **Cuánto grabar:** en la práctica, sesiones cortas (del orden de 1-2 horas de manejo activo) **no alcanzan** — el piloto resultante falla en curvas o situaciones que el dataset no cubrió lo suficiente. Grabá varias sesiones, con varias vueltas completas cada una y buena variedad de curvas, y sumalas antes de entrenar.
 
 ### Fase 3 — Entrenar la CNN
 
@@ -349,7 +350,7 @@ Seleccionables con el argumento `world:=` del launch file (archivos en [`worlds/
 | `racetrack_decorated.sdf` | Circuito con barreras y bloques 3D decorativos — más pesado de renderizar, útil para ver el resultado final con mejor ambientación |
 | `camera_world.sdf` | Circuito circular simple, liviano, alternativa válida para cualquier fase |
 
-> `oval_track.sdf` y `circuito_ovalo.sdf` no son usados por el pipeline CNN — pertenecen a la línea opcional de Aprendizaje por Refuerzo.
+> `oval_track.sdf` y `circuito_ovalo.sdf` no son usados por el pipeline CNN documentado en este repositorio.
 
 ---
 
@@ -368,17 +369,15 @@ Detalle completo, con notas de depuración textuales, en [`informeTecnicoCNN.md`
 - Usá siempre `headless:=true` mientras grabás datos o entrenás — no necesitás ver la ventana 3D de Gazebo para esas fases, y ahorra la mayor parte del uso de CPU/GPU.
 - Preferí `world:=racetrack` (o `camera_world`) sobre `racetrack_decorated` durante grabación/entrenamiento — la decoración 3D extra solo suma costo de renderizado sin aportar a los datos.
 - Instalá con `./scripts/setup_all.sh` (PyTorch CPU) salvo que tengas GPU NVIDIA — evita descargar ~2 GB extra de librerías CUDA que no vas a usar.
-- No instales `scripts/install_optional_tools.sh` si no vas a usar RViz2, teleclado o RL — son paquetes que no aporta nada al pipeline CNN y consumen espacio/RAM.
+- No instales `scripts/install_optional_tools.sh` si no vas a usar RViz2 o teleclado — son paquetes que no aportan nada al pipeline CNN y consumen espacio/RAM.
 - Cerrá las terminales de Fase 0/1/2 antes de entrenar (Fase 3) — `train_cnn` no necesita la simulación corriendo y libera CPU/RAM para el entrenamiento.
 
 ---
 
 ## 🧪 Extensiones opcionales (no forman parte del flujo principal)
 
-El repositorio incluye dos líneas de trabajo adicionales, documentadas en sus propios informes, que **no son necesarias** para reproducir el resultado del piloto CNN y no están cubiertas en detalle acá:
-
-- **Piloto por Aprendizaje por Refuerzo (PPO, LiDAR):** `train_sb3` / `sb3_pilot`, sobre el entorno `racetrack_env.py`. Requiere `requirements-optional.txt` (Gymnasium + Stable-Baselines3). Ver [`informeAprendizajeRefuerzo.md`](informeAprendizajeRefuerzo.md).
-- **Seguidor de línea clásico (OpenCV, sin Deep Learning):** `vision_sim_node`, detección por color HSV + centroide. Ver [`INFORME_VISION.md`](INFORME_VISION.md).
+- **Seguidor de línea clásico (OpenCV, sin Deep Learning):** `vision_sim_node`, detección por color HSV + centroide. No es necesario para reproducir el resultado del piloto CNN. Ver [`INFORME_VISION.md`](INFORME_VISION.md).
+- **AWS EC2 con GPU (opcional, si tenés presupuesto):** todo el pipeline corre en una laptop sin GPU, pero si querés acelerar el entrenamiento y el renderizado de Gazebo, se puede correr en una instancia con GPU dedicada (ej. `g4dn.xlarge`, NVIDIA T4) sin cambiar código — `torch` usa la GPU automáticamente si está disponible. Detalle de instancias y costos aproximados en [`INFORME_VISION.md`, Sección 8](INFORME_VISION.md).
 
 ---
 
@@ -394,6 +393,6 @@ El repositorio incluye dos líneas de trabajo adicionales, documentadas en sus p
 
 ## 📄 Informe técnico completo
 
-Este README es una guía práctica rápida. El desarrollo matemático completo, el flujo y código completo del piloto experto por LiDAR (bootstrap: PID → grabador → clonación → piloto experto), el código de los nodos del pipeline CNN explicado línea por línea, la guía extendida de ejecución (con comandos completos y rutas para cada fase) y las preguntas frecuentes de exposición académica están en:
+Este README es la guía operativa (comandos completos, listos para copiar y pegar). El desarrollo matemático completo, el flujo y código completo del piloto experto por LiDAR (bootstrap: PID → grabador → clonación → piloto experto), y el código de los nodos del pipeline CNN explicado línea por línea están en:
 
 **[`informeTecnicoCNN.md`](informeTecnicoCNN.md)**
