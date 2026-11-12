@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estudio CAD 3D y Simulador 4WD Smart Car | Tracción Diferencial</title>
+  <meta name="description" content="Estudio CAD 3D interactivo y simulador de física con tracción diferencial para el 4WD Smart Car Robot con ESP32 y ESP32-CAM.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <!-- 3D Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- Top Navigation Bar -->
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M12 3v18M3 12h18"/>
+          <circle cx="12" cy="12" r="3" fill="currentColor"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="brand-title">4WD SMART CAR ROBOT</h1>
+        <div class="brand-subtitle">ESTUDIO CAD 3D &bull; SIMULADOR CINEMÁTICO DIFERENCIAL</div>
+      </div>
+    </div>
+
+    <!-- Mode Selector Tabs -->
+    <div class="mode-tabs">
+      <button id="btn-mode-cad" class="tab-btn active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        Estudio CAD 3D
+      </button>
+      <button id="btn-mode-sim" class="tab-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+        Simulador de Tracción
+      </button>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="header-actions">
+      <button id="btn-sound-toggle" class="icon-btn" title="Activar/Silenciar Sonido de Motores">
+        <svg id="icon-sound-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+        <svg id="icon-sound-off" class="hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+      </button>
+      <button id="btn-reset-pos" class="icon-btn" title="Reiniciar Robot / Cámara">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Left Floating Panel: CAD Tools / View Controls -->
+  <aside id="panel-cad" class="floating-panel panel-left">
+    <div class="panel-section-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+      Herramientas CAD
+    </div>
+
+    <!-- Camera Presets -->
+    <div class="control-group">
+      <label class="control-label">Vistas Predefinidas</label>
+      <div class="btn-grid-4">
+        <button id="cam-iso" class="view-btn active" title="Perspectiva Isométrica">ISO</button>
+        <button id="cam-top" class="view-btn" title="Vista Cenital Superior">TOP</button>
+        <button id="cam-front" class="view-btn" title="Vista Frontal">FRNT</button>
+        <button id="cam-side" class="view-btn" title="Vista Lateral">SIDE</button>
+      </div>
+    </div>
+
+    <!-- Exploded View Slider -->
+    <div class="control-group">
+      <div class="slider-header">
+        <label for="slider-exploded" class="control-label">Vista Explosionada</label>
+        <span id="exploded-val" class="slider-badge">0%</span>
+      </div>
+      <input type="range" id="slider-exploded" min="0" max="100" value="0" step="1" class="cyber-slider">
+    </div>
+
+    <!-- Rendering Modes -->
+    <div class="control-group">
+      <label class="control-label">Modo de Renderizado</label>
+      <div class="btn-grid-3">
+        <button id="shading-pbr" class="view-btn active">PBR</button>
+        <button id="shading-wire" class="view-btn">Malla</button>
+        <button id="shading-xray" class="view-btn">Rayos X</button>
+      </div>
+    </div>
+
+    <!-- Interactive Component List -->
+    <div class="control-group">
+      <label class="control-label">Componentes (Clic para inspeccionar)</label>
+      <div class="component-list" id="component-tree">
+        <div class="comp-item" data-comp="Chasis_Jeep"><span>Carrocería Mini-Jeep Off-Road</span></div>
+        <div class="comp-item" data-comp="Placa_inferior"><span>Placa Inferior (3mm PLA)</span></div>
+        <div class="comp-item" data-comp="Placa_superior"><span>Placa Superior (3mm PLA)</span></div>
+        <div class="comp-item" data-comp="Ruedas"><span>4x Ruedas de Goma 65mm</span></div>
+        <div class="comp-item" data-comp="Motores"><span>4x Motores DC TT con Reductora</span></div>
+        <div class="comp-item" data-comp="Protoboard"><span>Protoboard 400 Puntos</span></div>
+        <div class="comp-item" data-comp="LiDAR_Hokuyo"><span>Sensor Láser 2D LiDAR (Hokuyo)</span></div>
+        <div class="comp-item" data-comp="ESP32_CAM"><span>Módulo ESP32-CAM + Soporte 3D</span></div>
+        <div class="comp-item" data-comp="ESP32_WROOM"><span>ESP32-WROOM DevKit</span></div>
+        <div class="comp-item" data-comp="Cables"><span>Arnés de Cables Jumper Dupont</span></div>
+        <div class="comp-item" data-comp="LM2596S"><span>Regulador Step-Down LM2596S</span></div>
+        <div class="comp-item" data-comp="L298N"><span>Controlador de Motores L298N</span></div>
+        <div class="comp-item" data-comp="Baterias"><span>Portabaterías 2x 18650</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Right Floating Panel: Component Inspector Modal/Card -->
+  <aside id="panel-inspector" class="floating-panel panel-right">
+    <div class="inspector-header">
+      <div class="inspector-badge" id="insp-category">ELECTRÓNICA</div>
+      <h2 class="inspector-title" id="insp-name">ESP32-CAM (OV2640)</h2>
+      <p class="inspector-desc" id="insp-desc">Módulo de visión por computadora con cámara de 2MP para transmisión de video en tiempo real.</p>
+    </div>
+
+    <div class="inspector-specs" id="insp-specs">
+      <div class="spec-row">
+        <span class="spec-label">Voltaje Operativo:</span>
+        <span class="spec-value" id="spec-volt">5.0 V (Regulado)</span>
+      </div>
+      <div class="spec-row">
+        <span class="spec-label">Consumo Típico:</span>
+        <span class="spec-value" id="spec-curr">180 mA (Pico 500 mA Wi-Fi)</span>
+      </div>
+      <div class="spec-row">
+        <span class="spec-label">Dimensiones:</span>
+        <span class="spec-value" id="spec-dim">27.0 &times; 40.0 &times; 1.6 mm</span>
+      </div>
+      <div class="spec-row">
+        <span class="spec-label">Rol en el Robot:</span>
+        <span class="spec-value highlight" id="spec-role">Captura y streaming de video IP / CNN</span>
+      </div>
+    </div>
+
+    <div class="inspector-notes">
+      <strong>Conexión con ESP32:</strong>
+      <p id="insp-notes">Alimentado desde los 5V del LM2596S. Conectado vía UART (U0T/U0R a GPIO16/17 del ESP32) para comandos de sincronización.</p>
+    </div>
+  </aside>
+
+  <!-- Bottom Floating Panel: Differential Kinematics Simulator & Controls -->
+  <div id="panel-sim" class="sim-dashboard hidden">
+    <!-- Differential Telemetry HUD -->
+    <div class="telemetry-bar">
+      <div class="telem-item">
+        <span class="telem-label">VEL. LINEAL (V)</span>
+        <span class="telem-val" id="telem-v">0.00 <small>m/s</small></span>
+      </div>
+      <div class="telem-item">
+        <span class="telem-label">VEL. ANGULAR (&omega;)</span>
+        <span class="telem-val" id="telem-w">0.0 <small>&deg;/s</small></span>
+      </div>
+      <div class="telem-item">
+        <span class="telem-label">MOTOR IZQ. (L298N)</span>
+        <span class="telem-val" id="telem-pwm-l">0 <small>PWM</small></span>
+      </div>
+      <div class="telem-item">
+        <span class="telem-label">MOTOR DER. (L298N)</span>
+        <span class="telem-val" id="telem-pwm-r">0 <small>PWM</small></span>
+      </div>
+      <div class="telem-item">
+        <span class="telem-label">ESTADO TRACCIÓN</span>
+        <span class="telem-val status-badge" id="telem-status">DETENIDO</span>
+      </div>
+    </div>
+
+    <!-- LiDAR Distance Telemetry HUD Bar -->
+    <div class="telemetry-laser-bar">
+      <div class="telem-laser-item" id="card-dist-l">
+        <span class="telem-label">DIST. IZQ (LÁSER)</span>
+        <span class="telem-val" id="telem-dist-l">-- <small>m</small></span>
+      </div>
+      <div class="telem-laser-item" id="card-dist-f">
+        <span class="telem-label">DIST. FRONTAL</span>
+        <span class="telem-val" id="telem-dist-f">-- <small>m</small></span>
+      </div>
+      <div class="telem-laser-item" id="card-dist-r">
+        <span class="telem-label">DIST. DER (LÁSER)</span>
+        <span class="telem-val" id="telem-dist-r">-- <small>m</small></span>
+      </div>
+      <div class="telem-laser-item" id="card-dist-err">
+        <span class="telem-label">DESVÍO DEL CENTRO</span>
+        <span class="telem-val" id="telem-lane-err">0.0 <small>cm</small></span>
+      </div>
+      <div class="telem-laser-item">
+        <span class="telem-label">MODO AUTÓNOMO</span>
+        <span class="telem-val status-badge" id="telem-pilot-status">MANUAL</span>
+      </div>
+    </div>
+
+    <!-- On-screen Differential Drive Controls -->
+    <div class="sim-controls-grid">
+      <!-- D-Pad Controls for Differential Drive -->
+      <div class="dpad-container">
+        <button id="btn-drive-fwd" class="dpad-btn dpad-up" title="Avanzar (W / &uarr;)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+        </button>
+        <div class="dpad-horizontal">
+          <button id="btn-drive-left" class="dpad-btn dpad-left" title="Giro Tanque Izquierda (A / &larr;)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <button id="btn-drive-stop" class="dpad-btn dpad-stop" title="Freno de Emergencia (Espacio)">
+            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          </button>
+          <button id="btn-drive-right" class="dpad-btn dpad-right" title="Giro Tanque Derecha (D / &rarr;)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+        <button id="btn-drive-rev" class="dpad-btn dpad-down" title="Retroceder (S / &darr;)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+      </div>
+
+      <!-- Kinematics Explanation Card -->
+      <div class="kinematics-info">
+        <div class="kin-title">Principio de Tracción Diferencial &amp; Centrado:</div>
+        <div class="formula-box">
+          <code>V = (V_R + V_L) / 2</code>
+          <code>&omega; = PID(Error_{centrado})</code>
+        </div>
+        <p class="kin-note">
+          Sensores láser 2D miden la distancia lateral a cada pared de la pista Gazebo. El algoritmo calcula el centro óptimo y regula el diferencial automáticamente.
+        </p>
+      </div>
+
+      <!-- Autopilot / Wall-Follower Controls -->
+      <div class="autopilot-toggle-container">
+        <button id="btn-autopilot" class="autopilot-btn" title="Activar/Desactivar Centrado Láser Autónomo PID (Tecla P)">
+          <span class="pilot-indicator-dot"></span>
+          <span id="autopilot-label">PILOTO AUTÓNOMO: APAGADO</span>
+        </button>
+        <button id="btn-toggle-laser" class="view-btn active" style="font-size: 0.72rem; padding: 4px 10px;" title="Mostrar/Ocultar Haces Láser 3D (Tecla L)">
+          Haces Láser: VISIBLES
+        </button>
+      </div>
+
+      <!-- Camera Follow Modes -->
+      <div class="cam-follow-group">
+        <label class="control-label">Cámara de Simulación</label>
+        <button id="sim-cam-chase" class="view-btn active">Persecución 3D</button>
+        <button id="sim-cam-orbit" class="view-btn">Órbita Libre</button>
+        <button id="sim-cam-fpv" class="view-btn">Cámara FPV (ESP32-CAM)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FPV (First Person View) Live PiP Window -->
+  <div id="fpv-pip" class="fpv-window hidden">
+    <div class="fpv-header">
+      <div class="fpv-dot"></div>
+      <span id="fpv-title">ESP32-CAM STREAM</span>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <button id="btn-toggle-flash" title="Encender/Apagar Linterna Flash ESP32-CAM" style="background:#1e293b;border:1px solid #475569;color:#94a3b8;border-radius:4px;padding:2px 6px;font-size:10px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:3px;">
+          <span>💡</span><span id="flash-status-text">OFF</span>
+        </button>
+        <button id="btn-reconnect-cam" title="Reconectar stream de video" style="background:#1e293b;border:1px solid #475569;color:#38bdf8;border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer;">🔄</button>
+        <button id="btn-close-fpv" class="fpv-close">&times;</button>
+      </div>
+    </div>
+    <div class="fpv-viewport">
+      <canvas id="fpv-canvas" width="320" height="240"></canvas>
+      <img id="fpv-real-img" class="hidden" alt="ESP32-CAM Stream" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:2;">
+      <div class="fpv-crosshair"></div>
+      <div class="fpv-hud-text top-left" id="fpv-hud-status">FPS: 30.0 &bull; 3D SIM</div>
+      <div class="fpv-hud-text bottom-right" id="fpv-hud-info">FOV: 66&deg; &bull; AUTO</div>
+    </div>
+    <div class="fpv-stream-bar" style="display:flex;gap:4px;padding:6px;background:#0d1527;border-top:1px solid #1e293b;align-items:center;">
+      <input type="text" id="input-cam-ip" placeholder="IP ESP32-CAM (ej: 192.168.100.25)" style="flex:1;background:#1e293b;border:1px solid #334155;color:#fff;border-radius:4px;padding:3px 6px;font-size:11px;font-family:monospace;">
+      <select id="select-cam-mode" title="Modo de Transmisión" style="background:#1e293b;border:1px solid #334155;color:#00f2fe;border-radius:4px;padding:3px 4px;font-size:10px;cursor:pointer;">
+        <option value="stream">MJPEG :81</option>
+        <option value="snapshot">Snap :80 (Anti-Freeze)</option>
+      </select>
+      <button id="btn-connect-cam" style="background:#00f2fe;color:#000;border:none;border-radius:4px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;">Conectar</button>
+    </div>
+  </div>
+
+  <!-- Keyboard Shortcuts Help Overlay -->
+  <div class="keyboard-legend">
+    <div class="key-pill"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>o Flechas: Manejo Diferencial</span></div>
+    <div class="key-pill"><kbd>Espacio</kbd><span>Freno</span></div>
+    <div class="key-pill"><kbd>P</kbd><span>Piloto Autónomo</span></div>
+    <div class="key-pill"><kbd>L</kbd><span>Láser</span></div>
+    <div class="key-pill"><kbd>C</kbd><span>Cámara</span></div>
+    <div class="key-pill"><kbd>R</kbd><span>Reiniciar</span></div>
+  </div>
+
+  <!-- Main JavaScript App -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>

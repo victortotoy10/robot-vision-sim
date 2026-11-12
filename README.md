@@ -1,398 +1,304 @@
-# 🏎️ Robot Vision Sim — Auto Autónomo por Visión de Cámara (CNN)
+# 🏎️ Robot Vision Sim — Sistema Integral de Navegación Autónoma y Control por Visión
 
-**Simulación en ROS 2 Humble + Gazebo Sim de un auto de carreras que maneja de forma 100% autónoma usando exclusivamente su cámara**, mediante una Red Neuronal Convolucional (CNN) entrenada por aprendizaje por imitación end-to-end (arquitectura estilo **PilotNet**, NVIDIA 2016).
+**Plataforma robótica completa de visión computacional y conducción autónoma**, compuesta por dos vertientes sincronizadas:
+1. 🚗 **Robot Físico 4WD Smart Car:** Arquitectura embebida de doble microcontrolador (**ESP32 DevKit** para tracción diferencial skid-steering con puente H L298N + **ESP32-CAM OV2640** para streaming MJPEG de baja latencia vía Hotspot directo de Laptop).
+2. 🧠 **Simulación e IA en ROS 2 Humble + Gazebo Sim:** Auto autónomo que maneja en circuito cerrado mediante una Red Neuronal Convolucional (CNN estilo **PilotNet**, NVIDIA 2016) entrenada por aprendizaje por imitación end-to-end.
+3. 🎮 **Panel HUD Web y Telemetría:** Interfaz web táctil interactiva ([`PaginaWebCarro/`](PaginaWebCarro/)) con visor de cámara en vivo, control manual D-Pad, monitoreo de FPS y render 3D.
+4. 🔐 **Seguridad y Parámetros (.env):** Protección estricta de credenciales de red mediante plantillas [`.env.example`](.env.example) y exclusión total de datos privados en Git.
 
-> ✅ **Resultado logrado:** el piloto CNN (`neural_pilot_node`) completa el circuito sin colisionar, manejando en bucle cerrado a partir únicamente de los píxeles de `/camera/image_raw` — sin LiDAR y sin ninguna regla de color programada a mano. Este es el resultado central del proyecto y lo único que este README documenta en detalle.
+---
+
+## 📑 Índice General
+
+- [🚗 BLOQUE I: Robot Físico 4WD (ESP32 + ESP32-CAM)](#-bloque-i-robot-físico-4wd-esp32--esp32-cam)
+  - [Arquitectura de Microcontroladores](#11-arquitectura-de-doble-microcontrolador)
+  - [Esquema de Pines y Conexiones Eléctricas](#12-esquema-de-pines-y-conexiones-físicas)
+  - [Red de Ultra Baja Latencia (Hotspot de Laptop)](#13-red-de-baja-latencia-zona-con-cobertura-de-laptop)
+  - [Endpoints de la API REST y Streaming](#14-endpoints-de-la-api-rest-y-streaming)
+  - [Compilación y Flasheo con ESP-IDF](#15-compilación-y-flasheo-con-esp-idf)
+- [🧠 BLOQUE II: Simulación y Navegación Autónoma CNN (ROS 2 + Gazebo)](#-bloque-ii-simulación-y-navegación-autónoma-cnn-ros-2--gazebo)
+  - [Metodología y Flujo en 4 Fases](#21-metodología-y-flujo-completo)
+  - [Arquitectura de la Red CNN (RacerCNN)](#22-arquitectura-de-la-red-cnn-racercnn)
+  - [Estructura del Proyecto ROS 2](#23-estructura-del-proyecto)
+  - [Guía de Ejecución de la Simulación](#24-guía-de-ejecución-de-la-simulación)
+- [🔐 BLOQUE III: Configuración de Variables de Entorno (.env)](#-bloque-iii-configuración-de-variables-de-entorno-env)
+- [🛠️ BLOQUE IV: Diagnóstico y Resolución de Problemas Físicos](#-bloque-iv-diagnóstico-y-resolución-de-problemas-físicos)
+- [📚 Referencias y Documentación Técnica](#-referencias-y-documentación-técnica)
+
+---
+
+# 🚗 BLOQUE I: Robot Físico 4WD (ESP32 + ESP32-CAM)
+
+### 1.1 Arquitectura de Doble Microcontrolador
+Para evitar la contención de recursos entre la captura/codificación JPEG y la generación de señales PWM de alta frecuencia para los motores, la carga de procesamiento se distribuye en dos SoCs ESP32 independientes:
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                            CHASIS FÍSICO 4WD SMART CAR                       │
+│                                                                              │
+│  ┌────────────────────────┐                   ┌───────────────────────────┐  │
+│  │   ESP32-CAM (OV2640)   │                   │    ESP32 DevKit V1        │  │
+│  │  - Sensor 2 MP + PSRAM │                   │  - Control Cinemático     │  │
+│  │  - MJPEG Streaming    │                   │  - 2x PWM LEDC (Motores)  │  │
+│  │  - Core 1 Task         │                   │  - Watchdog Fail-Safe     │  │
+│  │  IP: 192.168.137.48    │                   │  - Web HUD Server         │  │
+│  └───────────┬────────────┘                   │  IP: 192.168.137.47       │  │
+│              │                                └─────────────┬─────────────┘  │
+│              │                                              │                │
+│              │ Wi-Fi 2.4 GHz Directo                        │ GPIOs L298N    │
+│              ▼                                              ▼                │
+│    ┌────────────────────────────────────────┐     ┌───────────────────┐      │
+│    │  LAPTOP HOTSPOT (192.168.137.1)        │     │  Puente H L298N   │      │
+│    │  - ROS 2 Node / Autonomous Pilot       │     │  - 4x Motores DC  │      │
+│    │  - Web Remote HUD (Control Táctil)     │     │  - Batería 7.4-12V│      │
+│    └────────────────────────────────────────┘     └───────────────────┘      │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 1.2 Esquema de Pines y Conexiones Físicas
+
+#### ESP32 DevKit (Control Motriz) ➔ Módulo Puente H L298N
+El control de dirección utiliza tracción diferencial tipo oruga (*skid-steering*):
+
+| Función | Pin L298N | Pin ESP32 | Tipo de Señal | Rango / Descripción |
+| :--- | :--- | :--- | :--- | :--- |
+| **PWM Derecho** | **ENA** | **GPIO 32** | Salida PWM LEDC | Canal 0, 1 kHz, 8 bits (0 - 255) |
+| Sentido Der. 1 | **IN1** | **GPIO 33** | Salida Digital | Lógica de giro motor derecho |
+| Sentido Der. 2 | **IN2** | **GPIO 22** | Salida Digital | Lógica de giro motor derecho |
+| Sentido Izq. 1 | **IN3** | **GPIO 27** | Salida Digital | Lógica de giro motor izquierdo |
+| Sentido Izq. 2 | **IN4** | **GPIO 26** | Salida Digital | Lógica de giro motor izquierdo |
+| **PWM Izquierdo** | **ENB** | **GPIO 25** | Salida PWM LEDC | Canal 1, 1 kHz, 8 bits (0 - 255) |
+| **Tierra Común** | **GND** | **GND** | Masa de Referencia | **Unido al polo (-) de baterías y L298N** |
+
+> [!IMPORTANT]
+> **Retiro de Jumpers ENA y ENB:** El módulo L298N incluye de fábrica dos puentes negros en los pines ENA y ENB que fijan la velocidad al 100%. Para habilitar el control variable de aceleración por PWM desde el ESP32, **debes retirar estos dos jumpers** y conectar los pines hembra a GPIO 32 y GPIO 25.
 >
-> El repositorio también contiene una línea de trabajo **opcional** (un seguidor de línea clásico por OpenCV, sin Deep Learning) que no forma parte del flujo principal — ver [Sección 11](#-extensiones-opcionales-no-forman-parte-del-flujo-principal).
+> **Masa Común Compartida (Common Ground):** El pin GND del ESP32, GND del ESP32-CAM, GND del L298N y el borne negativo de la fuente de alimentación deben estar unificados en un mismo bus común.
+
+#### ESP32-CAM (Visión por Computadora)
+* **Alimentación:** Pin `5V` (alimentado por convertidor DC-DC Buck regulado a 5.0 V estables con capacidad mínima de 2 A).
+* **Sensor de Imagen:** OV2640 con soporte PSRAM externa habilitado en `sdkconfig`.
+* **Frecuencia XCLK:** 10 MHz (`CAMERA_GRAB_WHEN_EMPTY`) para evitar desincronización de DMA y colas de cuadros obsoletos.
+* **LED Flash Frontal:** `GPIO 4`.
+* **LED de Estado:** `GPIO 33`.
 
 ---
 
-## 📑 Índice
+### 1.3 Red de Baja Latencia (Zona con Cobertura de Laptop)
 
-1. [Metodología y flujo completo](#-metodología-y-flujo-completo)
-2. [Arquitectura de la red CNN](#-arquitectura-de-la-red-cnn-racercnn)
-3. [Estructura de carpetas y archivos](#-estructura-de-carpetas-y-archivos)
-4. [Cómo se relacionan y ejecutan los archivos](#-cómo-se-relacionan-y-ejecutan-los-archivos)
-5. [Requisitos de sistema (optimizado para laptop)](#-requisitos-de-sistema-optimizado-para-laptop)
-6. [Instalación](#-instalación)
-7. [Guía de ejecución paso a paso](#-guía-de-ejecución-paso-a-paso)
-8. [Pistas / mundos usados por el pipeline CNN](#-pistas--mundos-usados-por-el-pipeline-cnn)
-9. [Problemas resueltos durante el desarrollo](#-problemas-resueltos-durante-el-desarrollo)
-10. [Consejos de rendimiento para laptops modestas](#-consejos-de-rendimiento-para-laptops-modestas)
-11. [Extensiones opcionales (no forman parte del flujo principal)](#-extensiones-opcionales-no-forman-parte-del-flujo-principal)
-12. [Referencias](#-referencias)
-13. [Informe técnico completo](#-informe-técnico-completo)
+Para eliminar la latencia de routers intermediarios y garantizar transmisión fluida de video, el robot se enlaza a la **Zona con cobertura inalámbrica móvil de Windows (Hotspot)**:
+
+1. **Configuración en Windows:**
+   - SSID: `LAPTOP_ROBOT`
+   - Contraseña: `12345678` (configurable en `.env`)
+   - Banda de red: **2.4 GHz**
+   - **Ahorro de energía: DESACTIVADO** (vital para que Windows no suspenda el punto de acceso ante pausas breves de paquetes).
+2. **Asignación IP Estática:**
+   - **Gateway Laptop:** `192.168.137.1`
+   - **ESP32 Motores:** `192.168.137.47`
+   - **ESP32-CAM:** `192.168.137.48`
 
 ---
 
-## 🧠 Metodología y flujo completo
+### 1.4 Endpoints de la API REST y Streaming
 
-La idea central: en vez de programar reglas ("girá cuando veas esto"), se le muestran a una red neuronal miles de ejemplos de (imagen de cámara → comando de manejo correcto), hasta que aprende sola a relacionar lo que ve con lo que tiene que hacer. Esto se llama **aprendizaje por imitación end-to-end**.
+#### ESP32-CAM (`http://192.168.137.48`):
+* `GET :81/stream`: Streaming de video continuo MJPEG en puerto dedicado 81.
+* `GET /cam.jpg`: Fotograma JPEG estático en tiempo real (consumible por OpenCV / ROS 2).
+* `GET /status`: Telemetría del sensor en formato JSON (`fps`, `framesize`, `psram`, `rssi`).
+* `GET /flash?val=1`: Enciende (`1`) o apaga (`0`) el reflector LED frontal.
 
-Para grabar esos ejemplos hace falta que **algo** maneje bien primero. Por eso el flujo completo tiene **4 pasos**, uno de bootstrap (Fase 0, se corre una sola vez) y tres del pipeline CNN propiamente dicho:
+#### ESP32 Motores (`http://192.168.137.47`):
+* `GET /`: Interfaz HUD de control remoto táctil D-Pad servida desde la memoria flash del ESP32.
+* `GET /fwd`, `/rev`, `/left`, `/right`, `/stop`: Comandos de navegación discreta.
+* `GET /drive?l=200&r=200`: Control analógico diferencial continuo (valores de `-255` a `+255`).
+* `GET /speed?val=220`: Ajuste dinámico de velocidad base.
+* `GET /status`: JSON con estado cinemático, ciclo de trabajo y tiempo de actividad (`uptime_ms`).
+
+> [!NOTE]
+> **Watchdog de Seguridad Activo:** El firmware del ESP32 incorpora un temporizador de seguridad de **1500 ms**. Si se interrumpe la comunicación con el nodo de control o navegador, el microcontrolador detiene inmediatamente ambos motores.
+
+---
+
+### 1.5 Compilación y Flasheo con ESP-IDF
+
+Los proyectos se encuentran estructurados con sus archivos `CMakeLists.txt` y `sdkconfig` independientes en la carpeta [`CarroFisico/`](CarroFisico/):
+
+#### Flashear ESP32 de Motores (`COM4`):
+```bash
+cd CarroFisico/ESP32_Motores
+idf.py set-target esp32
+idf.py build
+idf.py -p COM4 flash monitor
+```
+
+#### Flashear ESP32-CAM (`COM5`):
+Si se utiliza un módulo adaptador con botones (ESP32-CAM-MB):
+1. Mantener presionado `IO0`.
+2. Presionar y soltar `RST`.
+3. Soltar `IO0` para ingresar a modo descarga.
+```bash
+cd CarroFisico/ESP32_Camara
+idf.py set-target esp32
+idf.py build
+idf.py -p COM5 flash monitor
+```
+
+---
+
+# 🧠 BLOQUE II: Simulación y Navegación Autónoma CNN (ROS 2 + Gazebo)
+
+### 2.1 Metodología y Flujo Completo
+El sistema entrena una red neuronal convolucional por **aprendizaje por imitación end-to-end** para mapear directamente los píxeles crudos de la cámara frontal (`/camera/image_raw`) a comandos de dirección y aceleración (`/cmd_vel`), sin reglas manuales de color ni segmentación geométrica.
 
 ```mermaid
 graph TD
-    subgraph Fase0 ["Fase 0 (una sola vez): generar el piloto experto"]
-        WF["artudo_wall_follower — PID por LiDAR (regla fija, sin IA)"] -->|Maneja el auto sin chocar| SIM0["Gazebo Sim"]
+    subgraph Fase0 ["Fase 0: Generación del Piloto Experto"]
+        WF["artudo_wall_follower — PID por LiDAR"] -->|Maneja sin colisionar| SIM0["Gazebo Sim"]
         SIM0 -->|/scan + /cmd_vel| REC0["artudo_data_recorder"]
         REC0 -->|artudo_expert_dataset.npz| TR0["train_artudo_cloning"]
-        TR0 -->|Entrena una MLP pequeña por LiDAR| MODEL0["artudo_expert_model.pth"]
+        TR0 -->|Entrena MLP pequeña| MODEL0["artudo_expert_model.pth"]
     end
 
-    subgraph Fase1 ["Fase 1: generar manejo correcto (piloto experto)"]
-        MODEL0 -->|Carga el modelo| EXPERTO["artudo_neural_pilot — piloto experto por LiDAR"]
-        EXPERTO -->|Maneja el auto sin chocar| SIM["Gazebo Sim (pista)"]
+    subgraph Fase1 ["Fase 1: Manejo Experto de Referencia"]
+        MODEL0 -->|Carga modelo experto| EXPERTO["artudo_neural_pilot (LiDAR)"]
+        EXPERTO -->|Controla el auto| SIM["Gazebo Sim (Pista)"]
     end
 
-    subgraph Fase2 ["Fase 2: grabar lo que ve la cámara"]
+    subgraph Fase2 ["Fase 2: Grabación del Dataset Visual"]
         SIM -->|Imagen de /camera/image_raw| REC["data_recorder_node"]
-        SIM -->|Comando activo en /cmd_vel| REC
+        SIM -->|Comando /cmd_vel| REC
         REC -->|Guarda pares imagen-comando| DATA["~/training_data/ (images/ + data.csv)"]
     end
 
-    subgraph Fase3 ["Fase 3: entrenar la CNN"]
-        DATA -->|Alimenta| GPU["PyTorch (train_cnn)"]
-        GPU -->|80 épocas de descenso de gradiente| MODEL["racer_model.pth"]
+    subgraph Fase3 ["Fase 3: Entrenamiento de la CNN"]
+        DATA -->|Entrenamiento| GPU["PyTorch (train_cnn)"]
+        GPU -->|80 épocas de optimización Adam| MODEL["racer_model.pth"]
     end
 
-    subgraph Fase4 ["Fase 4: manejar SOLO con la cámara — EL RESULTADO"]
-        MODEL -->|Carga la CNN| PILOTCNN["neural_pilot_node"]
-        PILOTCNN -->|Inferencia sobre píxeles de /camera/image_raw| SIM
+    subgraph Fase4 ["Fase 4: Navegación Autónoma por Cámara"]
+        MODEL -->|Carga pesos de red| PILOTCNN["neural_pilot_node"]
+        PILOTCNN -->|Inferencia en bucle cerrado| SIM
     end
 ```
 
-### Los 4 pasos explicados
+---
 
-* **Fase 0 — Bootstrap del piloto experto (una sola vez, LiDAR):** el "piloto experto" no viene de fábrica: primero un controlador PID clásico por LiDAR (`artudo_wall_follower`, sin IA, solo geometría) maneja el auto sin chocar mientras `artudo_data_recorder` graba sus lecturas de LiDAR + comandos. Con ese dataset, `train_artudo_cloning` entrena una red pequeña (MLP de 4 capas) que clona ese comportamiento y queda guardada en `~/dataset_artudo/artudo_expert_model.pth`. Una vez generado este archivo, la Fase 0 no hace falta repetirla.
-* **Fase 1 — El piloto experto maneja (caja negra por LiDAR):** `artudo_neural_pilot` carga `artudo_expert_model.pth` y maneja el auto de forma autónoma **usando solo LiDAR**. Es el generador de "buen manejo" que necesita el paso siguiente — su funcionamiento interno no es relevante para el resultado final (que es 100% por cámara), se lo usa únicamente como fuente de datos.
-* **Fase 2 — Grabar lo que ve la cámara:** mientras el piloto experto maneja, `data_recorder_node` guarda, varias veces por segundo, la imagen de la cámara junto con el comando de manejo (`linear.x`, `angular.z`) vigente en ese instante exacto.
-* **Fase 3 — Entrenar la CNN:** `train_cnn` toma esas parejas (imagen, comando) y entrena la red `RacerCNN` para predecir el comando correcto a partir de la imagen.
-* **Fase 4 — Manejar solo con la cámara (el resultado):** se apaga el piloto experto (LiDAR) y se enciende `neural_pilot_node`, que maneja el auto viendo **exclusivamente** la cámara.
+### 2.2 Arquitectura de la Red CNN (`RacerCNN`)
+Inspirada en **PilotNet** (NVIDIA 2016), optimizada para inferencia en tiempo real en CPUs de laptop:
 
-📄 El desarrollo matemático completo (convolución, ReLU, backpropagation, Adam, balanceo de dataset), el flujo y código completo del piloto experto por LiDAR (Sección 4), y el código de cada nodo explicado línea por línea están en [`informeTecnicoCNN.md`](informeTecnicoCNN.md).
+| Capa | Tipo de Operación | Dimensión de Salida | Activación |
+| :--- | :--- | :--- | :--- |
+| **Entrada** | Imagen RGB normalizada | $3 \times 120 \times 160$ | Normalización $[0, 1]$ |
+| **Conv1** | `Conv2d(3, 24, kernel=5, stride=2)` | $24 \times 58 \times 78$ | ReLU |
+| **Conv2** | `Conv2d(24, 36, kernel=5, stride=2)` | $36 \times 27 \times 37$ | ReLU |
+| **Conv3** | `Conv2d(36, 48, kernel=5, stride=2)` | $48 \times 12 \times 17$ | ReLU |
+| **Conv4** | `Conv2d(48, 64, kernel=3, stride=1)` | $64 \times 10 \times 15$ | ReLU |
+| **Conv5** | `Conv2d(64, 64, kernel=3, stride=1)` | $64 \times 8 \times 13$ | ReLU |
+| **Aplanado** | `Flatten` | $6656$ | — |
+| **FC1** | `Linear(6656, 100)` | $100$ | ReLU |
+| **FC2** | `Linear(100, 50)` | $50$ | ReLU |
+| **Salida** | `Linear(50, 2)` | $2$ (`linear_x`, `angular_z`) | Lineal |
 
 ---
 
-## 🏗️ Arquitectura de la red CNN (`RacerCNN`)
-
-Imagen de entrada $120 \times 160 \times 3$ (RGB, normalizada a $[0,1]$) → 5 capas convolucionales → aplanado → 3 capas totalmente conectadas → 2 salidas (`linear_x`, `angular_z`):
-
-| Capa | Tipo | Dimensión de salida |
-|---|---|---|
-| Entrada | Imagen normalizada | $3 \times 120 \times 160$ |
-| Conv1 | `Conv2d(3,24,k=5,s=2)` + ReLU | $24 \times 58 \times 78$ |
-| Conv2 | `Conv2d(24,36,k=5,s=2)` + ReLU | $36 \times 27 \times 37$ |
-| Conv3 | `Conv2d(36,48,k=5,s=2)` + ReLU | $48 \times 12 \times 17$ |
-| Conv4 | `Conv2d(48,64,k=3,s=1)` + ReLU | $64 \times 10 \times 15$ |
-| Conv5 | `Conv2d(64,64,k=3,s=1)` + ReLU | $64 \times 8 \times 13$ |
-| Flatten | Aplanado | $6656$ |
-| FC1 → FC2 → FC3 | `Linear` 6656→100→50→2 | `[linear_x, angular_z]` |
-
-Entrenamiento: `MSELoss`, optimizador `Adam` (`lr=0.0005`), lotes de 64, 80 épocas, con balanceo de dataset (se descarta parte de los tramos rectos para no sesgar el aprendizaje hacia "seguir siempre derecho"). Detalle matemático completo en [`informeTecnicoCNN.md`, Secciones 2 y 3](informeTecnicoCNN.md).
-
----
-
-## 📂 Estructura de carpetas y archivos
+### 2.3 Estructura del Proyecto
 
 ```
 robot-vision-sim/
-├── src/sim_vision_test/                  # Paquete ROS 2 (ament_python) — TODO el código Python vive acá
-│   ├── package.xml                       # Dependencias ROS del paquete (rclpy, cv_bridge, etc.)
-│   ├── setup.py                          # Registra cada nodo como ejecutable de "ros2 run"
-│   └── sim_vision_test/
-│       ├── artudo_wall_follower_node.py  # Fase 0: PID por LiDAR (sin IA) — genera el dataset del piloto experto
-│       ├── artudo_data_recorder_node.py  # Fase 0: graba LiDAR + comando -> artudo_expert_dataset.npz
-│       ├── train_artudo_cloning.py       # Fase 0: entrena la MLP del piloto experto -> artudo_expert_model.pth
-│       ├── artudo_neural_pilot_node.py   # Fase 1: piloto experto (carga artudo_expert_model.pth, maneja por LiDAR)
-│       ├── data_recorder.py              # Fase 2: graba cámara + comando -> ~/training_data/
-│       ├── train_cnn.py                  # Fase 3: entrena RacerCNN -> racer_model.pth
-│       └── neural_pilot_node.py          # Fase 4: PILOTO FINAL (carga racer_model.pth, maneja por cámara)
+├── CarroFisico/                      # Firmware C ESP-IDF para el robot real
+│   ├── ESP32_Motores/                # Proyecto ESP-IDF para control motriz (COM4)
+│   ├── ESP32_Camara/                 # Proyecto ESP-IDF para streaming de video (COM5)
+│   ├── Esp32.c                       # Código fuente unificado del motor controller
+│   ├── Esp32Cam.c                    # Código fuente unificado del streaming OV2640
+│   └── README.md                     # Guía técnica específica del hardware físico
+├── PaginaWebCarro/                   # Interfaz HUD web con telemetría y render 3D
+├── src/sim_vision_test/              # Paquete de ROS 2 Humble (Python)
+│   ├── sim_vision_test/
+│   │   ├── artudo_wall_follower_node.py # Fase 0: PID por LiDAR
+│   │   ├── artudo_data_recorder_node.py # Fase 0: Grabador de datos LiDAR
+│   │   ├── train_artudo_cloning.py      # Fase 0: Entrenamiento MLP experto
+│   │   ├── artudo_neural_pilot_node.py  # Fase 1: Piloto experto por LiDAR
+│   │   ├── data_recorder.py             # Fase 2: Grabador de datos visuales
+│   │   ├── train_cnn.py                 # Fase 3: Entrenamiento de RacerCNN
+│   │   └── neural_pilot_node.py         # Fase 4: Piloto autónomo CNN por cámara
 ├── launch/
-│   └── robot_camera.launch.py            # Levanta Gazebo + spawnea el robot + arma el puente ROS<->Gazebo
+│   └── robot_camera.launch.py        # Launch file principal de simulación en Gazebo
 ├── urdf/
-│   └── racer_robot.urdf                  # Descripción física del robot: chasis, ruedas, cámara y LiDAR simulados
-├── worlds/                                # Pistas/circuitos en formato SDF (ver Sección 8)
-├── meshes/                                # Modelos 3D (.dae) del auto y las pistas, referenciados por urdf/ y worlds/
-├── config/
-│   └── robot.rviz                        # Configuración de RViz2 (solo necesaria para depuración visual opcional)
-├── scripts/                               # Instalación (ver Sección 6)
-├── requirements.txt                       # Dependencias Python del pipeline CNN (torch, pandas, numpy)
-├── informeTecnicoCNN.md                   # Informe técnico completo del pipeline CNN (este es el documento de referencia)
-└── INFORME_VISION.md                      # Informe de la línea opcional de visión clásica + notas de infraestructura + AWS opcional
+│   └── racer_robot.urdf              # Descripción URDF del chasis, sensores y ruedas
+├── worlds/                           # Circuitos de simulación en formato SDF
+├── .env.example                      # Plantilla de configuración de red y credenciales
+├── .gitignore                        # Reglas de exclusión de binarios, caché y .env
+└── requirements.txt                  # Dependencias de Python (PyTorch, numpy, pandas)
 ```
-
-> `urdf/my_robot.urdf` es una versión anterior sin uso actual — el launch file carga `racer_robot.urdf`. No hace falta tocarlo.
 
 ---
 
-## 🔗 Cómo se relacionan y ejecutan los archivos
+### 2.4 Guía de Ejecución de la Simulación
 
-1. **`launch/robot_camera.launch.py`** es el punto de entrada de la simulación. Al correrlo:
-   - Lee `urdf/racer_robot.urdf`, reemplaza las rutas `package://` por rutas absolutas a `meshes/`, y publica esa descripción en el tópico `/robot_description`.
-   - Lee el archivo `worlds/<world>.sdf` elegido (parámetro `world:=`), parchea las rutas relativas de mallas a rutas absolutas de `meshes/`, y lanza **Gazebo Sim** con ese mundo (vía `ros_gz_sim`).
-   - Lanza `robot_state_publisher` (publica las transformadas TF del robot) y `ros_gz_bridge` (traduce mensajes entre Gazebo y ROS 2: `/cmd_vel`, `/odom`, `/scan`, `/camera/image_raw`, `/camera/camera_info`, `/clock`, `/tf`).
-   - Hace *spawn* del robot en la pista a partir de `/robot_description`.
-2. Con la simulación arriba, **los nodos Python** (`src/sim_vision_test/sim_vision_test/*.py`) se conectan por tópicos ROS — cada uno se lanza en su propia terminal con `ros2 run sim_vision_test <ejecutable>` (el nombre del ejecutable está mapeado en `setup.py`):
-   - `artudo_neural_pilot` **se suscribe** a `/scan` (LiDAR) y **publica** en `/cmd_vel` (Fase 1).
-   - `data_recorder_node` **se suscribe** a `/camera/image_raw` y a `/cmd_vel` (sin publicar nada) y escribe archivos en `~/training_data/` (Fase 2).
-   - `train_cnn` **no usa ROS**: es un script standalone que lee `~/training_data/data.csv` + `~/training_data/images/` del disco y escribe `~/training_data/racer_model.pth` (Fase 3).
-   - `neural_pilot_node` **se suscribe** a `/camera/image_raw` y **publica** en `/cmd_vel`, cargando `~/training_data/racer_model.pth` al arrancar (Fase 4).
-3. **Nunca correr dos nodos que publican en `/cmd_vel` al mismo tiempo** (por ejemplo `artudo_neural_pilot` junto con `neural_pilot_node`) — se pisan los comandos entre sí y el auto maneja de forma errática.
-4. Los datos generados (`~/training_data/`, `~/dataset_artudo/`) viven en el **home del usuario**, no dentro del repositorio — así una sesión de grabación no se pierde ni se mezcla con el código fuente, y podés borrar/regenerar el dataset sin afectar git.
-
----
-
-## 💻 Requisitos de sistema (optimizado para laptop)
-
-Pensado para correr en una laptop modesta, **sin GPU dedicada** — el entrenamiento de la CNN en sí es liviano (imágenes de 160×120, dataset chico). El cuello de botella real casi siempre es **Gazebo** (el motor de simulación 3D), no PyTorch.
-
-| Componente | Linux nativo o WSL2 | Máquina Virtual tradicional (VirtualBox/VMware) |
-| :--- | :--- | :--- |
-| **CPU** | 2 núcleos (headless) / 4 núcleos (con GUI 3D) | **4 núcleos dedicados como mínimo real** |
-| **RAM** | 4 GB (headless) / 8 GB (con GUI 3D) | **8 GB como mínimo real**, 12+ GB para ir cómodo |
-| **Disco** | 6-10 GB libres, SSD recomendado | Igual, evitando disco compartido/en red |
-| **GPU** | No requerida (PyTorch CPU, Gazebo con renderizado por software) | No requerida, pero el renderizado por software pesa más dentro de una VM |
-
-⚠️ **Importante sobre máquinas virtuales:** los números de la columna izquierda son para Linux corriendo directo sobre el hardware (o WSL2, que tiene una integración mucho más liviana con Windows). En pruebas reales, una VM tradicional (VirtualBox/VMware) con recursos ya generosos (4+ núcleos, ~9 GB RAM) **siguió sintiéndose lenta** — no es solo cuestión de sumar más CPU/RAM. La causa de fondo es que Gazebo renderiza por software (Mesa LLVMpipe) dentro de la VM, y ese renderizado tiene un techo de rendimiento bastante bajo sin importar cuántos recursos le asignes, sobre todo si la aceleración 3D de la VM no está bien configurada (revisá que esté habilitada en la config del hipervisor — ej. `VMSVGA` en VirtualBox — y forzá `headless:=true` mientras grabás/entrenás, que es donde más ayuda). Si después de eso una VM tradicional te sigue resultando lenta, **WSL2 o Linux nativo dan una experiencia notablemente mejor** para este proyecto específicamente por cómo manejan el renderizado 3D — si tenés esa opción, es la ruta más confiable en una laptop sin GPU dedicada.
-
-Ver [Sección 10](#-consejos-de-rendimiento-para-laptops-modestas) para más formas de aliviar el rendimiento en equipos limitados.
-
----
-
-## ⚙️ Instalación
-
-Los scripts en [`scripts/`](scripts/) instalan **solo lo necesario para el pipeline CNN** (nada de RViz, teleclado ni dependencias de RL por defecto — eso queda aparte y es opcional, ver más abajo). Todos los comandos están completos con su ruta, para poder copiarlos y pegarlos tal cual en una terminal nueva.
-
-> Requiere **Linux (Ubuntu 22.04)**, nativo o **WSL2** si desarrollás desde Windows — es el sistema operativo de ROS 2 Humble y Gazebo Sim.
-
-### Opción A — Instalación en un solo paso (recomendada)
-
+#### 1. Iniciar la Simulación en Gazebo:
 ```bash
-cd ~
-git clone <url-de-tu-fork-o-repo> robot-vision-sim
-cd ~/robot-vision-sim
-chmod +x scripts/*.sh
-
-# Instalación mínima: ROS 2 Humble (base) + Gazebo Sim + PyTorch CPU + build del workspace
-./scripts/setup_all.sh
-```
-
-Si tenés GPU NVIDIA y querés acelerar el entrenamiento (**opcional**, no hace falta en una laptop sin GPU):
-```bash
-cd ~/robot-vision-sim
-./scripts/setup_all.sh --cuda
-```
-
-### Opción B — Instalación paso a paso (mismo resultado, para entender/controlar cada etapa)
-
-```bash
-cd ~/robot-vision-sim
-
-# 1) ROS 2 Humble (base, sin GUI) + Gazebo Sim (ros_gz) + cv_bridge + colcon
-./scripts/install_ros2_gazebo.sh
-
-# 2) PyTorch + pandas + numpy — CPU por defecto (laptop sin GPU)
-./scripts/install_python_deps.sh
-# ...o con GPU NVIDIA (opcional):
-# ./scripts/install_python_deps.sh --cuda
-
-# 3) Compilar el paquete ROS 2 sim_vision_test
-./scripts/build_workspace.sh
-```
-
-Verificar que la instalación quedó lista:
-```bash
-source /opt/ros/humble/setup.bash
-source ~/robot-vision-sim/install/setup.bash
-ros2 pkg list | grep sim_vision_test
-```
-Si el comando anterior imprime `sim_vision_test`, la instalación fue exitosa.
-
-### Herramientas opcionales (NO hacen falta para el pipeline CNN)
-
-Solo si vas a depurar visualmente con RViz2, ver la cámara en vivo, o probar el seguidor de línea clásico (`vision_sim_node`, ver [`INFORME_VISION.md`](INFORME_VISION.md)):
-```bash
-cd ~/robot-vision-sim
-./scripts/install_optional_tools.sh
-```
-
-| Script | Qué instala | ¿Cuándo correrlo? |
-|---|---|---|
-| [`scripts/install_ros2_gazebo.sh`](scripts/install_ros2_gazebo.sh) | ROS 2 Humble **base** (sin GUI de escritorio), Gazebo Sim (`ros_gz`), `cv_bridge`, `colcon` | Siempre (paso 1) |
-| [`scripts/install_python_deps.sh`](scripts/install_python_deps.sh) | PyTorch (CPU por defecto, `--cuda` opcional), pandas, numpy | Siempre (paso 2) |
-| [`scripts/build_workspace.sh`](scripts/build_workspace.sh) | Compila el paquete `sim_vision_test` con `colcon build` | Siempre (paso 3), y de nuevo cada vez que se modifique el código |
-| [`scripts/setup_all.sh`](scripts/setup_all.sh) | Corre los 3 anteriores en orden | Alternativa a hacerlo paso a paso (Opción A) |
-| [`scripts/install_optional_tools.sh`](scripts/install_optional_tools.sh) | RViz2, `rqt_image_view`, teleclado | **Opcional** — no hace falta para el pipeline CNN |
-
----
-
-## ▶️ Guía de ejecución paso a paso
-
-Cada bloque de comandos está completo (ruta + `source` + comando) para poder tipearlo o pegarlo tal cual en una terminal nueva, sin pasos implícitos. Reemplazá `~/robot-vision-sim` por la ruta real si clonaste el repo en otro lugar.
-
-### Fase 0 — Generar el piloto experto por LiDAR (una sola vez)
-
-Bootstrap explicado con código completo en [`informeTecnicoCNN.md`, Sección 4](informeTecnicoCNN.md). Si todavía **no** existe `~/dataset_artudo/artudo_expert_model.pth`, generalo así (si ya existe, saltar directo a la Fase 1):
-
-**Terminal 1 — Simulación (headless recomendado en laptop):**
-```bash
-cd ~/robot-vision-sim
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 launch launch/robot_camera.launch.py world:=racetrack headless:=true
-```
-
-**Terminal 2 — Controlador PID por LiDAR (sin IA), maneja el auto:**
-```bash
-cd ~/robot-vision-sim
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 run sim_vision_test artudo_wall_follower
-```
-
-**Terminal 3 — Graba LiDAR + comandos mientras el PID maneja:**
-```bash
-cd ~/robot-vision-sim
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 run sim_vision_test artudo_data_recorder
-```
-Dejalo grabar varias vueltas y después `Ctrl+C` **en la Terminal 3** (el dataset se guarda recién al cerrar el nodo). Cerrá también las Terminales 1 y 2.
-
-**Terminal 4 — Entrenar la red del piloto experto:**
-```bash
-cd ~/robot-vision-sim
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 run sim_vision_test train_artudo_cloning
-```
-Esto genera `~/dataset_artudo/artudo_expert_model.pth`, usado por `artudo_neural_pilot` en la Fase 1. No hace falta repetir esta fase salvo que quieras cambiar el comportamiento base del piloto experto.
-
-### Fase 1 + 2 — Grabar datos de entrenamiento de la CNN (piloto experto maneja + se graba la cámara)
-
-**Terminal 1 — Simulación:**
-```bash
-cd ~/robot-vision-sim
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 launch launch/robot_camera.launch.py world:=racetrack headless:=true
-```
-
-**Terminal 2 — Piloto experto por LiDAR (genera el manejo correcto):**
-```bash
-cd ~/robot-vision-sim
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 run sim_vision_test artudo_neural_pilot
-```
-
-**Terminal 3 — Grabador de imagen + comando (cámara):**
-```bash
-cd ~/robot-vision-sim
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 run sim_vision_test data_recorder_node
-```
-⚠️ **No manejar manualmente durante esta fase** — `data_recorder_node` graba cualquier cosa que llegue a `/cmd_vel`, y una intervención humana contamina el dataset (ver [Sección 9](#-problemas-resueltos-durante-el-desarrollo)). `Ctrl+C` en la Terminal 3 para terminar. Los datos quedan en `~/training_data/images/` y `~/training_data/data.csv`, acumulándose entre sesiones (podés repetir esta fase varias veces y los datos se suman, no se pisan).
-
-⏱️ **Cuánto grabar:** en la práctica, sesiones cortas (del orden de 1-2 horas de manejo activo) **no alcanzan** — el piloto resultante falla en curvas o situaciones que el dataset no cubrió lo suficiente. Grabá varias sesiones, con varias vueltas completas cada una y buena variedad de curvas, y sumalas antes de entrenar.
-
-### Fase 3 — Entrenar la CNN
-
-```bash
-cd ~/robot-vision-sim
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 run sim_vision_test train_cnn
-```
-Muestra el progreso por época y guarda el modelo en `~/training_data/racer_model.pth`. En CPU, con el dataset típico de este proyecto, tarda del orden de minutos (no horas) — no hace falta GPU. Podés cerrar las terminales de la Fase 1 antes de entrenar.
-
-### Fase 4 — Manejar solo con la cámara (el resultado)
-
-**Terminal 1 — Simulación:**
-```bash
-cd ~/robot-vision-sim
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 launch launch/robot_camera.launch.py world:=racetrack_decorated headless:=false
 ```
 
-**Terminal 2 — Piloto CNN por cámara:**
+#### 2. Lanzar el Piloto Autónomo CNN:
+En una segunda terminal:
 ```bash
-cd ~/robot-vision-sim
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 run sim_vision_test neural_pilot_node
 ```
-Esta terminal maneja el auto solo, publicando en `/cmd_vel` en base a lo que la CNN predice mirando `/camera/image_raw`.
-
-**Terminal 3 (opcional) — Ver lo que la CNN está mirando:**
-```bash
-cd ~/robot-vision-sim
-source /opt/ros/humble/setup.bash
-ros2 run rqt_image_view rqt_image_view
-```
-Requiere `scripts/install_optional_tools.sh`. Seleccionar el tópico `/camera/image_raw` en la ventana.
-
-⚠️ **Nunca correr dos pilotos que publiquen en `/cmd_vel` al mismo tiempo** — ni `artudo_wall_follower` junto con `artudo_neural_pilot` (Fase 0), ni `artudo_neural_pilot` (Fase 1+2) junto con `neural_pilot_node` (Fase 4). Se pisan las órdenes entre sí.
 
 ---
 
-## 🗺️ Pistas / mundos usados por el pipeline CNN
+# 🔐 BLOQUE III: Configuración de Variables de Entorno (.env)
 
-Seleccionables con el argumento `world:=` del launch file (archivos en [`worlds/`](worlds/)):
+Para evitar exponer contraseñas privadas de Wi-Fi o configuraciones sensibles en repositorios públicos, el proyecto utiliza variables de entorno estandarizadas:
 
-| Archivo | Uso recomendado |
-|---|---|
-| `racetrack.sdf` | Recomendado para **grabar datos y entrenar** en equipos modestos — geometría simple, sin decoración extra, menor costo de renderizado |
-| `racetrack_decorated.sdf` | Circuito con barreras y bloques 3D decorativos — más pesado de renderizar, útil para ver el resultado final con mejor ambientación |
-| `camera_world.sdf` | Circuito circular simple, liviano, alternativa válida para cualquier fase |
+1. Crea tu archivo `.env` local a partir de la plantilla:
+   ```bash
+   cp .env.example .env
+   ```
+2. Modifica el contenido de `.env` según tu red:
+   ```env
+   # Red Wi-Fi Hotspot de la Laptop
+   LAPTOP_HOTSPOT_SSID=LAPTOP_ROBOT
+   LAPTOP_HOTSPOT_PASS=12345678
 
-> `oval_track.sdf` y `circuito_ovalo.sdf` no son usados por el pipeline CNN documentado en este repositorio.
+   # Red Wi-Fi de Router Local Alternativo
+   ROUTER_WIFI_SSID=TU_RED_WIFI
+   ROUTER_WIFI_PASS=TU_CONTRASENA
 
----
+   # Direcciones IP Estáticas
+   GATEWAY_IP=192.168.137.1
+   ESP32_MOTOR_IP=192.168.137.47
+   ESP32_CAM_IP=192.168.137.48
+   ```
 
-## 🛠️ Problemas resueltos durante el desarrollo
-
-1. **Errata de escala:** una versión anterior desnormalizaba la salida de la red multiplicando por los límites físicos del auto (`0.50`/`0.70`) en vez del inverso exacto de la normalización de entrenamiento (`2.0`/`3.0`), reduciendo el giro real enviado al auto a ~23% de lo predicho.
-2. **Suavizado de dirección mal calibrado:** un suavizado exponencial alto (`0.6`) introducía demasiado retraso frente a curvas cerradas, causando más choques. Quedó desactivado (`0.0`) por defecto, ajustable vía `--ros-args -p steer_smoothing:=X`.
-3. **Contaminación del dataset (causa raíz real):** intervenciones manuales del operador durante la grabación (Fase 2) quedaban registradas como si fueran ejemplos correctos, y la CNN las imitaba fielmente. La solución fue descartar ese dataset y regrabar dejando manejar exclusivamente al piloto experto, sin intervención manual.
-
-Detalle completo, con notas de depuración textuales, en [`informeTecnicoCNN.md`, Sección 7](informeTecnicoCNN.md).
-
----
-
-## ⚡ Consejos de rendimiento para laptops modestas
-
-- Usá siempre `headless:=true` mientras grabás datos o entrenás — no necesitás ver la ventana 3D de Gazebo para esas fases, y ahorra la mayor parte del uso de CPU/GPU.
-- Preferí `world:=racetrack` (o `camera_world`) sobre `racetrack_decorated` durante grabación/entrenamiento — la decoración 3D extra solo suma costo de renderizado sin aportar a los datos.
-- Instalá con `./scripts/setup_all.sh` (PyTorch CPU) salvo que tengas GPU NVIDIA — evita descargar ~2 GB extra de librerías CUDA que no vas a usar.
-- No instales `scripts/install_optional_tools.sh` si no vas a usar RViz2 o teleclado — son paquetes que no aportan nada al pipeline CNN y consumen espacio/RAM.
-- Cerrá las terminales de Fase 0/1/2 antes de entrenar (Fase 3) — `train_cnn` no necesita la simulación corriendo y libera CPU/RAM para el entrenamiento.
+El archivo `.gitignore` está configurado para **bloquear estrictamente la subida de `.env`**, archivos `.key`, `.bin`, `.elf` y reportes temporales de compilación.
 
 ---
 
-## 🧪 Extensiones opcionales (no forman parte del flujo principal)
+# 🛠️ BLOQUE IV: Diagnóstico y Resolución de Problemas Físicos
 
-- **Seguidor de línea clásico (OpenCV, sin Deep Learning):** `vision_sim_node`, detección por color HSV + centroide. No es necesario para reproducir el resultado del piloto CNN. Ver [`INFORME_VISION.md`](INFORME_VISION.md).
-- **AWS EC2 con GPU (opcional, si tenés presupuesto):** todo el pipeline corre en una laptop sin GPU, pero si querés acelerar el entrenamiento y el renderizado de Gazebo, se puede correr en una instancia con GPU dedicada (ej. `g4dn.xlarge`, NVIDIA T4) sin cambiar código — `torch` usa la GPU automáticamente si está disponible. Detalle de instancias y costos aproximados en [`INFORME_VISION.md`, Sección 8](INFORME_VISION.md).
-
----
-
-## 📚 Referencias
-
-- Bojarski, M. et al. (2016) — *"End to End Learning for Self-Driving Cars"* (**PilotNet**, NVIDIA) — arquitectura de referencia para `RacerCNN`: convoluciones + capas totalmente conectadas entrenadas end-to-end por aprendizaje por imitación.
-- [ROS 2 Humble](https://docs.ros.org/en/humble/) — middleware robótico usado para la comunicación entre nodos.
-- [Gazebo Sim](https://gazebosim.org/) (`ros_gz`) — simulador 3D y puente ROS↔Gazebo.
-- [PyTorch](https://pytorch.org/) — entrenamiento e inferencia de la CNN.
-- [OpenCV](https://opencv.org/) / [`cv_bridge`](https://github.com/ros-perception/vision_opencv) — conversión y preprocesamiento de imágenes.
+1. **Uno de los motores no gira o gira sin fuerza:**
+   - Verifica que el puente jumper de ENA o ENB en el L298N haya sido retirado si controlas velocidad por PWM.
+   - Comprueba con un multímetro que la batería entregue más de 7.4 V bajo carga.
+2. **El ESP32-CAM entra en bucle de reset o no se conecta al Hotspot:**
+   - En Windows, abre **Configuración ➔ Red e Internet ➔ Zona con cobertura inalámbrica móvil** y desactiva **"Ahorro de energía"**.
+   - Conecta un condensador electrolítico de 100 µF a 470 µF entre los pines `5V` y `GND` del ESP32-CAM para absorber los picos de consumo de la radio Wi-Fi.
+3. **El puerto serie queda bloqueado en `waiting for download`: **
+   - Si usas cable USB con módulo FTDI o ESP32-CAM-MB, pulsa el botón `RST` con `IO0` liberado para que el microcontrolador arranque desde la memoria SPI Flash normal.
 
 ---
 
-## 📄 Informe técnico completo
+# 📚 Referencias y Documentación Técnica
 
-Este README es la guía operativa (comandos completos, listos para copiar y pegar). El desarrollo matemático completo, el flujo y código completo del piloto experto por LiDAR (bootstrap: PID → grabador → clonación → piloto experto), y el código de los nodos del pipeline CNN explicado línea por línea están en:
-
-**[`informeTecnicoCNN.md`](informeTecnicoCNN.md)**
+* **Informe Técnico Completo de la CNN:** [`informeTecnicoCNN.md`](informeTecnicoCNN.md)
+* **Informe de Visión Clásica e Infraestructura:** [`INFORME_VISION.md`](INFORME_VISION.md)
+* **Documentación de la Interfaz Web:** [`PaginaWebCarro/README.md`](PaginaWebCarro/README.md)
+* Bojarski, M. et al. (2016) — *"End to End Learning for Self-Driving Cars"* (NVIDIA PilotNet).

@@ -10,11 +10,38 @@ __pycache__/
 *.pyd
 .pytest_cache/
 
-# IDE files
+# Environment Variables & Secrets (CRÍTICO: nunca subir credenciales ni contraseñas)
+.env
+.env.*
+!.env.example
+*.env
+*.key
+*.pem
+credentials.json
+
+# ESP-IDF & Embedded Build Artifacts
+**/build/
+**/managed_components/
+**/sdkconfig.old
+**/dependencies.lock
+*.bin
+*.elf
+*.map
+
+# IDE and Editor files
 .vscode/
 .idea/
 .project
 .pydevproject
 .settings/
+.clangd
+.devcontainer/
 .agents/
 .gemini/
+
+# OS metadata & temporary files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+*.tmp
+*.log

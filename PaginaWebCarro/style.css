@@ -1,0 +1,894 @@
+/* ==========================================================================
+   Estudio CAD 3D y Simulador 4WD Smart Car - Sistema de Estilos Glassmorphism
+   ========================================================================== */
+
+:root {
+  /* Paleta de Color HSL Curada */
+  --bg-primary: hsl(222, 47%, 7%);
+  --bg-surface: hsla(222, 47%, 11%, 0.75);
+  --bg-surface-hover: hsla(222, 47%, 16%, 0.85);
+  --bg-card: hsla(223, 35%, 15%, 0.6);
+  
+  --border-subtle: hsla(217, 33%, 25%, 0.5);
+  --border-focus: hsl(190, 95%, 50%);
+  
+  --accent-cyan: hsl(188, 98%, 52%);
+  --accent-cyan-glow: hsla(188, 98%, 52%, 0.35);
+  --accent-blue: hsl(217, 91%, 60%);
+  --accent-yellow: hsl(45, 96%, 53%);
+  --accent-red: hsl(0, 84%, 60%);
+  --accent-emerald: hsl(158, 85%, 48%);
+  
+  --text-main: hsl(210, 40%, 98%);
+  --text-muted: hsl(215, 20%, 65%);
+  --text-dim: hsl(215, 16%, 47%);
+  
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  
+  --shadow-elevation: 0 16px 36px hsla(222, 50%, 4%, 0.55), 0 0 1px hsla(217, 33%, 40%, 0.3);
+  --shadow-neon: 0 0 15px var(--accent-cyan-glow);
+  --backdrop-blur: blur(16px);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--bg-primary);
+  font-family: var(--font-sans);
+  color: var(--text-main);
+  line-height: 1.5;
+}
+
+/* 3D Canvas Viewport */
+#canvas-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+/* ==========================================================================
+   Header Superior
+   ========================================================================== */
+
+.app-header {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  background: var(--bg-surface);
+  backdrop-filter: var(--backdrop-blur);
+  -webkit-backdrop-filter: var(--backdrop-blur);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-elevation);
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-logo {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, hsla(188, 98%, 52%, 0.2), hsla(217, 91%, 60%, 0.2));
+  border: 1px solid var(--accent-cyan);
+  border-radius: var(--radius-md);
+  color: var(--accent-cyan);
+}
+
+.brand-logo svg {
+  width: 22px;
+  height: 22px;
+}
+
+.brand-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  background: linear-gradient(90deg, #ffffff, var(--accent-cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.brand-subtitle {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+}
+
+/* Mode Selector Tabs */
+.mode-tabs {
+  display: flex;
+  background: hsla(222, 47%, 6%, 0.6);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  gap: 4px;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tab-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.tab-btn:hover {
+  color: var(--text-main);
+  background: hsla(217, 33%, 25%, 0.3);
+}
+
+.tab-btn.active {
+  background: linear-gradient(135deg, hsl(190, 95%, 45%), hsl(217, 91%, 55%));
+  color: #ffffff;
+  box-shadow: 0 2px 10px hsla(190, 95%, 50%, 0.3);
+}
+
+/* Header Action Buttons */
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: hsla(222, 47%, 6%, 0.6);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.icon-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.icon-btn:hover {
+  color: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  background: var(--bg-surface-hover);
+  transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   Paneles Flotantes (Izquierda y Derecha)
+   ========================================================================== */
+
+.floating-panel {
+  position: absolute;
+  top: 88px;
+  z-index: 10;
+  width: 310px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  background: var(--bg-surface);
+  backdrop-filter: var(--backdrop-blur);
+  -webkit-backdrop-filter: var(--backdrop-blur);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  box-shadow: var(--shadow-elevation);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+}
+
+.panel-left {
+  left: 16px;
+}
+
+.panel-right {
+  right: 16px;
+  width: 330px;
+}
+
+.panel-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-cyan);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.panel-section-title svg {
+  width: 16px;
+  height: 16px;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.control-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Botoneras Grid */
+.btn-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.btn-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.view-btn {
+  padding: 7px 4px;
+  background: hsla(222, 47%, 6%, 0.6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.view-btn:hover {
+  color: var(--text-main);
+  border-color: var(--border-focus);
+}
+
+.view-btn.active {
+  background: hsla(188, 98%, 52%, 0.15);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  box-shadow: 0 0 10px hsla(188, 98%, 52%, 0.25);
+}
+
+/* Slider Explosionado Cyber */
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.slider-badge {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  background: hsla(188, 98%, 52%, 0.15);
+  border: 1px solid var(--accent-cyan);
+  border-radius: var(--radius-sm);
+  color: var(--accent-cyan);
+}
+
+.cyber-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: hsla(222, 47%, 6%, 0.8);
+  border-radius: 3px;
+  outline: none;
+}
+
+.cyber-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 8px var(--accent-cyan);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.cyber-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+/* Lista interactiva de componentes */
+.component-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 190px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.component-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.component-list::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 2px;
+}
+
+.comp-item {
+  padding: 6px 10px;
+  background: hsla(222, 47%, 6%, 0.4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comp-item:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-main);
+  border-color: var(--border-subtle);
+  transform: translateX(3px);
+}
+
+.comp-item.selected {
+  background: hsla(188, 98%, 52%, 0.15);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+/* ==========================================================================
+   Inspector de Componentes (Panel Derecho)
+   ========================================================================== */
+
+.inspector-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.inspector-badge {
+  align-self: flex-start;
+  padding: 2px 8px;
+  background: hsla(217, 91%, 60%, 0.15);
+  border: 1px solid var(--accent-blue);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--accent-blue);
+}
+
+.inspector-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.inspector-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.inspector-specs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.spec-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+  padding: 6px 8px;
+  background: hsla(222, 47%, 6%, 0.4);
+  border-radius: var(--radius-sm);
+}
+
+.spec-label {
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.spec-value {
+  font-family: var(--font-mono);
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+.spec-value.highlight {
+  color: var(--accent-cyan);
+}
+
+.inspector-notes {
+  background: hsla(45, 96%, 53%, 0.08);
+  border: 1px solid hsla(45, 96%, 53%, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  font-size: 0.75rem;
+  color: hsl(45, 80%, 75%);
+  line-height: 1.4;
+}
+
+.inspector-notes strong {
+  color: var(--accent-yellow);
+  display: block;
+  margin-bottom: 3px;
+}
+
+/* ==========================================================================
+   Simulador de Tracción Diferencial (Panel Inferior y HUD)
+   ========================================================================== */
+
+.sim-dashboard {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  z-index: 10;
+  background: var(--bg-surface);
+  backdrop-filter: var(--backdrop-blur);
+  -webkit-backdrop-filter: var(--backdrop-blur);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-elevation);
+  padding: 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.3s ease;
+}
+
+/* Barra de Telemetría */
+.telemetry-bar {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Barra de Telemetría Láser / LiDAR */
+.telemetry-laser-bar {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  padding-top: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.telem-laser-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: hsla(188, 98%, 52%, 0.05);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--accent-cyan);
+  transition: border-color 0.2s ease;
+}
+
+.telem-laser-item.warning {
+  border-left-color: var(--accent-yellow);
+}
+
+.telem-laser-item.danger {
+  border-left-color: var(--accent-red);
+}
+
+.telem-laser-item.centered {
+  border-left-color: var(--accent-emerald);
+}
+
+.telem-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: hsla(222, 47%, 6%, 0.5);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--accent-cyan);
+}
+
+.telem-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+}
+
+.telem-val {
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.telem-val small {
+  font-size: 0.7rem;
+  color: var(--accent-cyan);
+  font-weight: 400;
+}
+
+.status-badge {
+  font-size: 0.85rem !important;
+  color: var(--accent-emerald) !important;
+  align-self: flex-start;
+}
+
+/* Controles de Simulación (D-Pad, Info, Autopilot, Cámara) */
+.sim-controls-grid {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 18px;
+  align-items: center;
+}
+
+/* Controles de Autopiloto y Láser */
+.autopilot-toggle-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: hsla(222, 47%, 6%, 0.4);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+}
+
+.autopilot-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, hsla(217, 91%, 60%, 0.15), hsla(188, 98%, 52%, 0.15));
+  border: 1px solid var(--accent-cyan);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 10px hsla(188, 98%, 52%, 0.15);
+  white-space: nowrap;
+}
+
+.autopilot-btn:hover {
+  background: linear-gradient(135deg, hsla(217, 91%, 60%, 0.3), hsla(188, 98%, 52%, 0.3));
+  box-shadow: 0 0 16px hsla(188, 98%, 52%, 0.35);
+  transform: translateY(-1px);
+}
+
+.autopilot-btn.active {
+  background: linear-gradient(135deg, hsla(158, 85%, 48%, 0.3), hsla(188, 98%, 52%, 0.3));
+  border-color: var(--accent-emerald);
+  color: #ffffff;
+  box-shadow: 0 0 20px hsla(158, 85%, 48%, 0.5);
+  animation: pulse-emerald 2s infinite;
+}
+
+@keyframes pulse-emerald {
+  0%, 100% { box-shadow: 0 0 10px hsla(158, 85%, 48%, 0.3); }
+  50% { box-shadow: 0 0 22px hsla(158, 85%, 48%, 0.7); }
+}
+
+.pilot-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition: all 0.2s ease;
+}
+
+.autopilot-btn.active .pilot-indicator-dot {
+  background: var(--accent-emerald);
+  box-shadow: 0 0 8px var(--accent-emerald);
+}
+
+/* D-Pad Cruz */
+.dpad-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.dpad-horizontal {
+  display: flex;
+  gap: 4px;
+}
+
+.dpad-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: hsla(222, 47%, 6%, 0.7);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.dpad-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.dpad-btn:hover, .dpad-btn.active {
+  background: hsla(188, 98%, 52%, 0.2);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  transform: scale(0.96);
+}
+
+.dpad-stop:hover, .dpad-stop.active {
+  background: hsla(0, 84%, 60%, 0.2);
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+}
+
+/* Tarjeta Cinemática */
+.kinematics-info {
+  background: hsla(222, 47%, 6%, 0.4);
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+}
+
+.kin-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  margin-bottom: 4px;
+}
+
+.formula-box {
+  display: flex;
+  gap: 16px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  margin-bottom: 4px;
+  color: var(--accent-yellow);
+}
+
+.kin-note {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+/* Selector Cámara Simulación */
+.cam-follow-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ==========================================================================
+   Ventana PiP FPV (ESP32-CAM Stream)
+   ========================================================================== */
+
+.fpv-window {
+  position: absolute;
+  top: 88px;
+  right: 16px;
+  z-index: 20;
+  width: 320px;
+  background: var(--bg-surface);
+  backdrop-filter: var(--backdrop-blur);
+  -webkit-backdrop-filter: var(--backdrop-blur);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-elevation);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.fpv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: hsla(222, 47%, 6%, 0.8);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text-main);
+}
+
+.fpv-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-red);
+  box-shadow: 0 0 6px var(--accent-red);
+  animation: pulse-red 1.5s infinite;
+}
+
+@keyframes pulse-red {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.fpv-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.fpv-viewport {
+  position: relative;
+  width: 320px;
+  height: 240px;
+  background: #000000;
+}
+
+#fpv-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.fpv-crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 24px;
+  border: 1px solid hsla(188, 98%, 52%, 0.5);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.fpv-hud-text {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--accent-cyan);
+  text-shadow: 0 0 4px #000000;
+  pointer-events: none;
+}
+
+.fpv-hud-text.top-left {
+  top: 8px;
+  left: 8px;
+}
+
+.fpv-hud-text.bottom-right {
+  bottom: 8px;
+  right: 8px;
+}
+
+/* ==========================================================================
+   Leyenda Inferior de Atajos de Teclado
+   ========================================================================== */
+
+.keyboard-legend {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  gap: 12px;
+  background: hsla(222, 47%, 7%, 0.65);
+  backdrop-filter: var(--backdrop-blur);
+  padding: 6px 16px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-subtle);
+  pointer-events: none;
+}
+
+.key-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+kbd {
+  padding: 2px 6px;
+  background: hsla(222, 47%, 16%, 0.9);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: #ffffff;
+}
+
+/* Clases de Utilidad */
+.hidden {
+  display: none !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .app-header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .floating-panel {
+    width: calc(100% - 32px);
+    max-height: 40vh;
+  }
+  .panel-right {
+    top: auto;
+    bottom: 16px;
+  }
+  .sim-controls-grid {
+    grid-template-columns: 1fr;
+  }
+  .telemetry-bar, .telemetry-laser-bar {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
